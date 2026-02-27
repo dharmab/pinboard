@@ -339,6 +339,75 @@ body {
   outline: none;
 }
 
+/* ── Card photo ── */
+.card-photo {
+  position: relative;
+  margin: -12px -12px 8px -12px;
+  height: 140px;
+  overflow: hidden;
+  border-radius: 7px 7px 0 0;
+}
+
+.card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-photo-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.card-photo:hover .card-photo-overlay {
+  opacity: 1;
+}
+
+.card-photo-overlay svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.card-photo-broken {
+  background: var(--card-border);
+}
+
+.card-photo-broken::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='m21 15-5-5L5 21'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.card-content.card-drop-target {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
 /* ── Floating panel ── */
 .floating-panel {
   position: absolute;
@@ -398,6 +467,55 @@ body {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--panel-border);
+}
+
+.panel-thumbnail {
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.panel-photo-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.panel-btn:hover {
+  background: var(--button-hover-bg);
+}
+
+.panel-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.panel-btn-danger {
+  border-color: var(--danger-color);
+  color: var(--danger-color);
+}
+
+.panel-btn-danger:hover {
+  background: var(--danger-color);
+  color: #fff;
 }
 
 .panel-remove-btn {

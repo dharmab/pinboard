@@ -1,7 +1,37 @@
 const CARD_WIDTH = 220;
 const NS = 'http://www.w3.org/2000/svg';
 
-export function createCardElement(placement, card, callbacks) {
+function createPhotoDiv(imageUrl, onOverlayClick) {
+  const photoDiv = document.createElement('div');
+  photoDiv.className = 'card-photo';
+
+  const img = document.createElement('img');
+  img.src = imageUrl;
+  img.alt = '';
+  img.draggable = false;
+  img.addEventListener('error', () => {
+    photoDiv.classList.add('card-photo-broken');
+    img.style.display = 'none';
+  });
+  photoDiv.appendChild(img);
+
+  if (onOverlayClick) {
+    const overlay = document.createElement('button');
+    overlay.className = 'card-photo-overlay';
+    overlay.title = 'Change photo';
+    overlay.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+    overlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onOverlayClick();
+    });
+    overlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+    photoDiv.appendChild(overlay);
+  }
+
+  return photoDiv;
+}
+
+export function createCardElement(placement, card, callbacks, imageUrl) {
   const g = document.createElementNS(NS, 'g');
   g.dataset.placementId = placement.id;
   g.dataset.cardId = card.id;
@@ -14,6 +44,12 @@ export function createCardElement(placement, card, callbacks) {
 
   const div = document.createElement('div');
   div.className = 'card-content';
+
+  // Photo (before title)
+  if (imageUrl) {
+    const photoDiv = createPhotoDiv(imageUrl, () => callbacks.onPhotoClick?.(card.id));
+    div.appendChild(photoDiv);
+  }
 
   const titleDiv = document.createElement('div');
   titleDiv.className = 'card-title';
@@ -39,8 +75,8 @@ export function createCardElement(placement, card, callbacks) {
 
   g.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
-    // Don't start drag if we're in an input
-    if (e.target.tagName === 'INPUT') return;
+    // Don't start drag if we're in an input or clicking the photo overlay
+    if (e.target.tagName === 'INPUT' || e.target.closest('.card-photo-overlay')) return;
 
     isDragging = true;
     hasMoved = false;
@@ -126,7 +162,7 @@ function startInlineEdit(titleDiv, card, callbacks) {
   input.select();
 }
 
-export function updateCardElement(g, card) {
+export function updateCardElement(g, card, imageUrl, onPhotoClick) {
   const titleDiv = g.querySelector('.card-title');
   if (titleDiv && !titleDiv.querySelector('input')) {
     titleDiv.textContent = card.title;
@@ -142,6 +178,26 @@ export function updateCardElement(g, card) {
     descDiv.textContent = card.description;
   } else if (descDiv) {
     descDiv.remove();
+  }
+
+  // Photo update
+  const content = g.querySelector('.card-content');
+  let photoDiv = content.querySelector('.card-photo');
+
+  if (imageUrl) {
+    if (!photoDiv) {
+      photoDiv = createPhotoDiv(imageUrl, onPhotoClick ? () => onPhotoClick(card.id) : null);
+      content.insertBefore(photoDiv, content.firstChild);
+    } else {
+      const img = photoDiv.querySelector('img');
+      if (img) {
+        img.src = imageUrl;
+        img.style.display = '';
+      }
+      photoDiv.classList.remove('card-photo-broken');
+    }
+  } else if (photoDiv) {
+    photoDiv.remove();
   }
 
   adjustCardHeight(g);

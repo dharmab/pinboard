@@ -2,7 +2,7 @@ import { initTheme, toggleTheme } from './ui/theme.js';
 import { initToolbar, updateZoomDisplay } from './ui/toolbar.js';
 import { initTabBar, renderTabs } from './ui/tabbar.js';
 import { initCanvas, getViewport, setViewport, zoomIn, zoomOut, zoomReset, fitAll, setSelection, getSvg } from './ui/canvas.js';
-import { initFloatingPanel, showCardPanel, showGroupPanel, showConnectionPanel, hidePanel } from './ui/floating-panel.js';
+import { initFloatingPanel, showCardPanel, showGroupPanel, showConnectionPanel, hidePanel, getCurrentPlacementId } from './ui/floating-panel.js';
 import { createCardElement, updateCardElement, adjustCardHeight, getCardRect } from './ui/card.js';
 import { createGroupElement, updateGroupElement, getGroupRect } from './ui/group.js';
 import { createConnectionElement, updateConnectionPath, showHandles, hideHandles, buildPreviewPath, getHandleAnchor } from './ui/connection.js';
@@ -12,9 +12,13 @@ import { createTab, getTabsByBoard, updateTab, deleteTab as deleteTabStore } fro
 import { createPlacement, getPlacement, getPlacementsByTab, updatePlacement, deletePlacement } from './store/placements.js';
 import { createGroup, getGroup, getGroupsByTab, updateGroup, deleteGroup } from './store/groups.js';
 import { createConnection, getConnection, getConnectionsByTab, updateConnection, deleteConnection, deleteConnectionsByTab } from './store/connections.js';
+import { saveImage, getImage } from './store/images.js';
 import { dbPut } from './store/db.js';
 import { executeCommand, undo, redo } from './utils/history.js';
 import { clientToCanvas } from './utils/geometry.js';
+
+const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const imageUrlCache = new Map(); // hash -> objectURL
 
 let currentBoard = null;
 let currentTabId = null;
@@ -106,6 +110,8 @@ async function init() {
       });
     },
     onRemoveFromTab: (placementId) => removePlacement(placementId),
+    onPhotoChange: (cardId, file) => attachPhotoToCard(cardId, file),
+    onPhotoRemove: (cardId) => removePhotoFromCard(cardId),
     onGroupLabelChange: (groupId, oldLabel, newLabel) => {
       executeCommand({
         execute: async () => {
@@ -148,6 +154,11 @@ async function init() {
 
   // Set up connection handle hover + drag on the SVG
   setupConnectionInteraction();
+
+  // Prevent browser default file drop behavior on canvas
+  const canvasContainer = document.getElementById('canvas-container');
+  canvasContainer.addEventListener('dragover', (e) => e.preventDefault());
+  canvasContainer.addEventListener('drop', (e) => e.preventDefault());
 
   // Render initial state
   renderTabs(tabs, currentTabId);
@@ -239,7 +250,7 @@ async function addCardAt(x, y) {
   const card = await createCard(currentBoard.id, 'New Card');
   const placement = await createPlacement(currentTabId, card.id, x, y);
 
-  const g = appendCardToLayer(placement, card);
+  const g = appendCardToLayer(placement, card, null);
   adjustCardHeight(g);
   setSelection(placement.id);
   announce(`Card created: ${card.title}`);
@@ -249,7 +260,7 @@ async function addCardAt(x, y) {
   const rect = svg.getBoundingClientRect();
   const screenX = x * getViewport().zoom + getViewport().x + rect.left + 230;
   const screenY = y * getViewport().zoom + getViewport().y + rect.top;
-  showCardPanel(placement.id, card, screenX, screenY);
+  showCardPanel(placement.id, card, screenX, screenY, null);
 
   // Wrap in undo command (the creation already happened, undo deletes)
   const placementId = placement.id;
@@ -318,10 +329,11 @@ async function removePlacement(placementId) {
   announce(`Card "${card?.title}" removed from tab`);
 }
 
-function appendCardToLayer(placement, card) {
+function appendCardToLayer(placement, card, imageUrl) {
   const cardLayer = document.getElementById('card-layer');
   const g = createCardElement(placement, card, {
     getZoom: () => getViewport().zoom,
+    onPhotoClick: (cardId) => openPhotoPicker(cardId),
     onCardMoved: async (placementId, oldX, oldY, newX, newY) => {
       // Check group membership changes
       const p = await getPlacement(placementId);
@@ -357,8 +369,9 @@ function appendCardToLayer(placement, card) {
       const cardData = await getCard(cardId);
       const g = cardLayer.querySelector(`[data-placement-id="${placementId}"]`);
       if (g && cardData) {
+        const cardImageUrl = await getImageUrl(cardData.image_filename);
         const gRect = g.getBoundingClientRect();
-        showCardPanel(placementId, cardData, gRect.right + 8, gRect.top);
+        showCardPanel(placementId, cardData, gRect.right + 8, gRect.top, cardImageUrl);
       }
     },
     onTitleEdited: (cardId, oldTitle, newTitle) => {
@@ -373,7 +386,30 @@ function appendCardToLayer(placement, card) {
         },
       });
     },
+  }, imageUrl);
+
+  // Set up drop-to-attach-photo
+  const contentDiv = g.querySelector('.card-content');
+  contentDiv.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    contentDiv.classList.add('card-drop-target');
   });
+  contentDiv.addEventListener('dragleave', () => {
+    contentDiv.classList.remove('card-drop-target');
+  });
+  contentDiv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    contentDiv.classList.remove('card-drop-target');
+    const file = e.dataTransfer.files[0];
+    if (file && ACCEPTED_IMAGE_TYPES.has(file.type)) {
+      attachPhotoToCard(card.id, file);
+    }
+  });
+
   cardLayer.appendChild(g);
   return g;
 }
@@ -408,7 +444,8 @@ async function renderPlacements() {
   for (const placement of placements) {
     const card = await getCard(placement.card_id);
     if (!card) continue;
-    const g = appendCardToLayer(placement, card);
+    const imgUrl = await getImageUrl(card.image_filename);
+    const g = appendCardToLayer(placement, card, imgUrl);
     // Defer height adjustment to next frame so DOM is settled
     requestAnimationFrame(() => adjustCardHeight(g));
   }
@@ -418,10 +455,11 @@ async function refreshCardInDom(cardId) {
   const card = await getCard(cardId);
   if (!card) return;
 
+  const imgUrl = await getImageUrl(card.image_filename);
   const cardLayer = document.getElementById('card-layer');
   const elements = cardLayer.querySelectorAll(`[data-card-id="${cardId}"]`);
   for (const g of elements) {
-    updateCardElement(g, card);
+    updateCardElement(g, card, imgUrl, (cId) => openPhotoPicker(cId));
   }
 }
 
@@ -657,6 +695,96 @@ async function deleteGroupAction(groupId) {
   });
 
   announce(`Group "${grp.label}" deleted`);
+}
+
+// ── Photo logic ──
+
+async function getImageUrl(hash) {
+  if (!hash) return null;
+  if (imageUrlCache.has(hash)) return imageUrlCache.get(hash);
+  const image = await getImage(hash);
+  if (!image || !image.data) return null;
+  const url = URL.createObjectURL(image.data);
+  imageUrlCache.set(hash, url);
+  return url;
+}
+
+function openPhotoPicker(cardId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+  input.addEventListener('change', () => {
+    if (input.files[0]) {
+      attachPhotoToCard(cardId, input.files[0]);
+    }
+  });
+  input.click();
+}
+
+async function attachPhotoToCard(cardId, file) {
+  if (!ACCEPTED_IMAGE_TYPES.has(file.type)) return;
+
+  const card = await getCard(cardId);
+  if (!card) return;
+
+  const oldHash = card.image_filename;
+  const hash = await saveImage(file, file.name);
+
+  executeCommand({
+    execute: async () => {
+      await updateCard(cardId, { image_filename: hash });
+      imageUrlCache.delete(hash); // force re-fetch for fresh URL
+      await refreshCardInDom(cardId);
+      refreshConnectionPaths();
+      await refreshPanelForCard(cardId);
+    },
+    undo: async () => {
+      await updateCard(cardId, { image_filename: oldHash });
+      await refreshCardInDom(cardId);
+      refreshConnectionPaths();
+      await refreshPanelForCard(cardId);
+    },
+  });
+}
+
+async function removePhotoFromCard(cardId) {
+  const card = await getCard(cardId);
+  if (!card || !card.image_filename) return;
+
+  const oldHash = card.image_filename;
+
+  executeCommand({
+    execute: async () => {
+      await updateCard(cardId, { image_filename: null });
+      await refreshCardInDom(cardId);
+      refreshConnectionPaths();
+      await refreshPanelForCard(cardId);
+    },
+    undo: async () => {
+      await updateCard(cardId, { image_filename: oldHash });
+      await refreshCardInDom(cardId);
+      refreshConnectionPaths();
+      await refreshPanelForCard(cardId);
+    },
+  });
+}
+
+async function refreshPanelForCard(cardId) {
+  const placementId = getCurrentPlacementId();
+  if (!placementId) return;
+
+  const placement = await getPlacement(placementId);
+  if (!placement || placement.card_id !== cardId) return;
+
+  const card = await getCard(cardId);
+  if (!card) return;
+
+  const imgUrl = await getImageUrl(card.image_filename);
+  const g = document.getElementById('card-layer').querySelector(`[data-placement-id="${placementId}"]`);
+  if (g) {
+    const gRect = g.getBoundingClientRect();
+    showCardPanel(placementId, card, gRect.right + 8, gRect.top, imgUrl);
+  }
 }
 
 // ── Shared utilities ──

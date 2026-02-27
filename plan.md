@@ -119,17 +119,20 @@
 - Undo/redo commands for: connection create, connection label edit, connection color change, connection delete
 - CSS styles: connection path stroke, hit area, handles (opacity transition, crosshair cursor, green highlight for valid target), preview line (dashed), label pill badge, color swatches in floating panel
 
+### Card Photos (Increment 4)
+
+- `src/store/images.js` — Full CRUD with SHA-256 deduplication via `crypto.subtle.digest`; `saveImage` computes hash, deduplicates, stores `{ hash, data: Blob, content_type, original_filename }`; `getImage` and `deleteImage` for retrieval and removal
+- `src/ui/card.js` — `createPhotoDiv` helper renders photo div with `<img>` (object-fit: cover, 140px height, full card width via negative margins), overlay camera button on hover for quick replace, broken-image placeholder via CSS `::after` pseudo-element on load error
+- `createCardElement` extended with `imageUrl` parameter; photo div inserted before title; pointerdown handler excludes `.card-photo-overlay` clicks from drag
+- `updateCardElement` extended with `imageUrl` and `onPhotoClick` parameters; handles add/remove/update of photo div in place
+- `src/ui/floating-panel.js` — `showCardPanel` extended with `imageUrl` parameter; photo section between description and actions: thumbnail (if present), "Change Photo" button (opens file picker, accepts JPEG/PNG/GIF/WebP), "Remove Photo" button (shown only when photo exists)
+- `src/app.js` — `imageUrlCache` (Map of hash → objectURL) with `getImageUrl` helper for lazy-loading; `openPhotoPicker` creates ephemeral file input; `attachPhotoToCard` saves image then wraps card update in undo command; `removePhotoFromCard` similar undo wrapper; `refreshPanelForCard` re-renders floating panel if currently showing the modified card; drop-to-attach via `dragover`/`drop` listeners on `.card-content` with file type validation; `dragover`/`drop` prevention on canvas container to block browser file navigation
+- Undo/redo commands for: photo attach (captures old hash, toggles `image_filename`), photo remove (same pattern)
+- CSS: `.card-photo` (negative margins, 140px height, overflow hidden, rounded top), `.card-photo-overlay` (absolute positioned, opacity transition on hover), `.card-photo-broken` (background fill + SVG placeholder icon via data URL), `.card-drop-target` (focus ring highlight), `.panel-thumbnail`, `.panel-photo-buttons`, `.panel-btn` / `.panel-btn-danger` button styles
+
 ---
 
 ## What's Left
-
-### Increment 4 — Card Photos
-
-- `src/store/images.js` — Full CRUD with SHA-256 deduplication via `crypto.subtle.digest`
-- Photo display on cards: fills card width at ~140px height, cropped to fill
-- Drop image onto card to attach
-- Floating panel: thumbnail, "Change Photo" button, "Remove Photo" button
-- Broken-image placeholder on load failure
 
 ### Increment 5 — Context Menus & Card Library
 

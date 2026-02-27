@@ -20,7 +20,7 @@ export function initFloatingPanel(cbs) {
   document.getElementById('canvas-container').appendChild(panelEl);
 }
 
-export function showCardPanel(placementId, card, screenX, screenY) {
+export function showCardPanel(placementId, card, screenX, screenY, imageUrl) {
   currentPlacementId = placementId;
   currentGroupId = null;
   currentConnectionId = null;
@@ -73,6 +73,52 @@ export function showCardPanel(placementId, card, screenX, screenY) {
   });
   descField.append(descLabel, descInput);
 
+  // Photo field
+  const photoField = document.createElement('div');
+  photoField.className = 'panel-field';
+  const photoLabel = document.createElement('label');
+  photoLabel.textContent = 'Photo';
+  photoField.appendChild(photoLabel);
+
+  if (imageUrl) {
+    const thumb = document.createElement('img');
+    thumb.src = imageUrl;
+    thumb.className = 'panel-thumbnail';
+    thumb.alt = 'Card photo';
+    photoField.appendChild(thumb);
+  }
+
+  const photoButtons = document.createElement('div');
+  photoButtons.className = 'panel-photo-buttons';
+
+  const changeBtn = document.createElement('button');
+  changeBtn.className = 'panel-btn';
+  changeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Change Photo`;
+  changeBtn.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+    input.addEventListener('change', () => {
+      if (input.files[0]) {
+        callbacks.onPhotoChange(card.id, input.files[0]);
+      }
+    });
+    input.click();
+  });
+  photoButtons.appendChild(changeBtn);
+
+  if (card.image_filename) {
+    const removePhotoBtn = document.createElement('button');
+    removePhotoBtn.className = 'panel-btn panel-btn-danger';
+    removePhotoBtn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Remove Photo`;
+    removePhotoBtn.addEventListener('click', () => {
+      callbacks.onPhotoRemove(card.id);
+    });
+    photoButtons.appendChild(removePhotoBtn);
+  }
+
+  photoField.appendChild(photoButtons);
+
   // Remove from tab button
   const actions = document.createElement('div');
   actions.className = 'panel-actions';
@@ -85,7 +131,7 @@ export function showCardPanel(placementId, card, screenX, screenY) {
   });
   actions.appendChild(removeBtn);
 
-  panelEl.append(titleField, descField, actions);
+  panelEl.append(titleField, descField, photoField, actions);
 
   positionPanel(screenX, screenY);
   panelEl.classList.add('visible');
