@@ -29,7 +29,7 @@ When the install finishes, it will print a **Next steps** section with two comma
 Git is a tool for downloading software projects. Bun is a tool for running JavaScript applications like Pinboard. Paste the following into Terminal and press Return:
 
 ```sh
-brew install git bun
+brew install git oven-sh/bun/bun
 ```
 
 ### 4. Download Pinboard
