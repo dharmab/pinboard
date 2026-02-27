@@ -173,6 +173,9 @@ async function init() {
   // Set up connection handle hover + drag on the SVG
   setupConnectionInteraction();
 
+  // Keyboard shortcuts
+  document.addEventListener('keydown', onKeyDown);
+
   // Handle drag-and-drop on canvas (card library + prevent default file drops)
   const canvasContainer = document.getElementById('canvas-container');
   canvasContainer.addEventListener('dragover', (e) => {
@@ -217,6 +220,8 @@ async function init() {
   await renderPlacements();
   await renderGroups();
   await renderConnections();
+  // Card heights are adjusted in a requestAnimationFrame; refresh connections after
+  requestAnimationFrame(() => refreshConnectionPaths());
   updateZoomDisplay(1.0);
 }
 
@@ -243,6 +248,7 @@ async function switchTab(tabId) {
   await renderPlacements();
   await renderGroups();
   await renderConnections();
+  requestAnimationFrame(() => refreshConnectionPaths());
   setSelection(null);
   hidePanel();
 }
@@ -448,6 +454,7 @@ function appendCardToLayer(placement, card, imageUrl) {
   const g = createCardElement(placement, card, {
     getZoom: () => getViewport().zoom,
     onPhotoClick: (cardId) => openPhotoPicker(cardId),
+    onCardDragging: refreshConnectionPaths,
     onCardMoved: async (placementId, oldX, oldY, newX, newY) => {
       // Check group membership changes
       const p = await getPlacement(placementId);
@@ -659,6 +666,7 @@ function appendGroupToLayer(group) {
   const groupLayer = document.getElementById('group-layer');
   const g = createGroupElement(group, {
     getZoom: () => getViewport().zoom,
+    onGroupResizing: () => refreshConnectionPaths(),
     onGroupMoved: async (groupId, oldX, oldY, newX, newY) => {
       const dx = newX - oldX;
       const dy = newY - oldY;
@@ -728,6 +736,7 @@ function appendGroupToLayer(group) {
         const newY = m.origY + dy;
         m.el.setAttribute('transform', `translate(${newX}, ${newY})`);
       }
+      refreshConnectionPaths();
     },
     onGroupResized: (groupId, oldBounds, newBounds) => {
       executeCommand({
@@ -1110,6 +1119,28 @@ async function deleteConnectionAction(connectionId) {
   announce('Connection deleted');
 }
 
+// ── Keyboard shortcuts ──
+
+function onKeyDown(e) {
+  // Don't intercept when typing in an input/textarea
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const selType = getSelectionType();
+    const ids = getSelectedIds();
+    if (!selType || ids.size === 0) return;
+
+    e.preventDefault();
+    if (selType === 'card') {
+      for (const id of ids) removePlacement(id);
+    } else if (selType === 'connection') {
+      for (const id of ids) deleteConnectionAction(id);
+    } else if (selType === 'group') {
+      for (const id of ids) deleteGroupAction(id);
+    }
+  }
+}
+
 // ── Connection handle hover + drag-to-create ──
 
 // Snap radius in canvas-space pixels for connection target detection
@@ -1159,6 +1190,7 @@ function setupConnectionInteraction() {
   svg.addEventListener('pointerdown', onHandleDragStart, true);
   svg.addEventListener('pointermove', onHandleDragMove);
   svg.addEventListener('pointerup', onHandleDragEnd);
+
 }
 
 function onHandleHover(e) {
@@ -1370,6 +1402,15 @@ async function onHandleDragEnd(e) {
 async function openCardLibrary() {
   const cards = await getCardsByBoard(currentBoard.id);
   await showCardLibrary(cards, getImageUrl, {
+    onPlaceCard: async (cardId) => {
+      const svg = getSvg();
+      const vp = getViewport();
+      const rect = svg.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const pos = clientToCanvas(svg, rect.left + centerX, rect.top + centerY, vp);
+      await placeCardFromLibrary(cardId, pos.x, pos.y);
+    },
     onDeleteCard: (cardId) => deleteCardEverywhere(cardId),
     onClose: () => {},
   });
@@ -1408,6 +1449,7 @@ async function switchBoard(boardId) {
   await renderPlacements();
   await renderGroups();
   await renderConnections();
+  requestAnimationFrame(() => refreshConnectionPaths());
   setSelection(null);
   hidePanel();
   setViewport({ x: 0, y: 0, zoom: 1.0 });

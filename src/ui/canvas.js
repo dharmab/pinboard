@@ -1,6 +1,7 @@
 import { clientToCanvas, clampZoom, boundingBox, fitToView } from '../utils/geometry.js';
 
-const ZOOM_STEP = 1.1;
+const ZOOM_SENSITIVITY = 0.005;
+const ZOOM_BUTTON_STEP = 1.2;
 
 let svg, viewportG;
 let viewport = { x: 0, y: 0, zoom: 1.0 };
@@ -90,7 +91,7 @@ function onWheel(e) {
   const canvasX = (mouseX - viewport.x) / viewport.zoom;
   const canvasY = (mouseY - viewport.y) / viewport.zoom;
 
-  const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+  const factor = Math.pow(2, -e.deltaY * ZOOM_SENSITIVITY);
   const newZoom = clampZoom(viewport.zoom * factor);
 
   // Adjust pan so the canvas point under cursor stays fixed
@@ -173,14 +174,14 @@ export function zoomIn() {
   const rect = svg.getBoundingClientRect();
   const cx = rect.width / 2;
   const cy = rect.height / 2;
-  zoomToward(cx, cy, ZOOM_STEP);
+  zoomToward(cx, cy, ZOOM_BUTTON_STEP);
 }
 
 export function zoomOut() {
   const rect = svg.getBoundingClientRect();
   const cx = rect.width / 2;
   const cy = rect.height / 2;
-  zoomToward(cx, cy, 1 / ZOOM_STEP);
+  zoomToward(cx, cy, 1 / ZOOM_BUTTON_STEP);
 }
 
 export function zoomReset() {

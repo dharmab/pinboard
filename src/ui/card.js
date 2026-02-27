@@ -103,6 +103,7 @@ export function createCardElement(placement, card, callbacks, imageUrl) {
     g.setAttribute('transform', `translate(${newX}, ${newY})`);
     placement.x = newX;
     placement.y = newY;
+    callbacks.onCardDragging?.();
   });
 
   g.addEventListener('pointerup', (e) => {

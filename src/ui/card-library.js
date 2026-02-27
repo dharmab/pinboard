@@ -108,6 +108,13 @@ export async function showCardLibrary(cards, getImageUrl, cbs) {
       });
       item.appendChild(deleteBtn);
 
+      // Click to place on canvas
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.card-library-item-delete')) return;
+        callbacks.onPlaceCard?.(card.id);
+        closeCardLibrary();
+      });
+
       // Drag to place on canvas
       item.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('application/x-pinboard-card', card.id);

@@ -127,11 +127,15 @@ function createLabelElement(text, color, x, y) {
   fo.setAttribute('width', '200');
   fo.setAttribute('height', '24');
 
+  const wrapper = document.createElement('div');
+  wrapper.style.width = '200px';
+  wrapper.style.textAlign = 'center';
   const span = document.createElement('span');
   span.className = 'connection-label';
   span.textContent = text;
   span.style.borderColor = CONNECTION_COLORS[color] || CONNECTION_COLORS.red;
-  fo.appendChild(span);
+  wrapper.appendChild(span);
+  fo.appendChild(wrapper);
   g.appendChild(fo);
 
   // Position centered on midpoint (adjusted after DOM insertion via updateConnectionPath)

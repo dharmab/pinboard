@@ -108,6 +108,7 @@ export function createGroupElement(group, callbacks) {
       group.width = newW;
       group.height = newH;
       applyGroupTransform(g, group);
+      callbacks.onGroupResizing?.();
     });
 
     handle.addEventListener('pointerup', (e) => {
