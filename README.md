@@ -1,8 +1,12 @@
 # Pinboard
 
-Pinboard is a visual relationship board that runs in your web browser. Place cards on a freeform canvas, group related cards into labeled containers, and draw labeled lines between them to map out relationships. Organize your work across multiple tabs within a board, and switch between boards as needed.
+Pinboard is a visual relationship board that runs in your web browser, inspired by the trope in old detective movies where the investigator pins photos of the evidence and persons of internet to a cork board and connects them with string. 
 
-Everything runs locally on your computer — no accounts, no cloud sync, no data leaving your machine. You can export your boards as ZIP files for backup, or as PNG and PDF images.
+Place cards on a freeform canvas, group related cards into labeled containers, and draw labeled lines between them to map out relationships. Organize your work across multiple tabs within a board, and switch between boards as needed.
+
+Everything runs locally on your computer — no accounts, no cloud sync, no data leaving your machine. You can export your boards as ZIP files for backup, or as WEBP/PNG or PDF files to share.
+
+I made Pinboard for my sibling. We're in a group watching _Twin Peaks_, a TV show that's like a combination soap opera and murder mystery. It's got a lot of characters and relationships, plus - SPOILER - an alternate dream reality and supernatural elements. My sibling was using image editing software to maintain a pinboard to keep track of all of this, but as the plot became too complicated they needed a better tool. They tried some SaaS products, but the software wasn't that great and wanted a monthly subscription for basic features. So I made this in like 3 hours using Claude Code instead.
 
 ## First-Time Setup
 
