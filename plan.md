@@ -16,7 +16,8 @@
 - `cards.js` — Card CRUD (create, get, getByBoard, update, delete)
 - `tabs.js` — Tab CRUD (create, get, getByBoard sorted by order, update, delete, reorder)
 - `placements.js` — Placement CRUD (create, get, getByTab, getByCard, update, delete, deleteByTab)
-- `groups.js`, `connections.js`, `images.js` — Stubs returning empty arrays; stores exist in the DB but no UI consumes them yet
+- `connections.js` — Full CRUD (create, get, getByTab, update, delete, deleteByTab)
+- `groups.js`, `images.js` — Stubs returning empty arrays; stores exist in the DB but no UI consumes them yet
 
 ### Utilities (`src/utils/`)
 
@@ -94,20 +95,33 @@
 - `fitAllElements()` includes group rects in bounding box calculation
 - Tab switching and deletion handle groups alongside placements
 
+### Connections (Increment 3)
+
+- `src/store/connections.js` — Full CRUD (create, get, getByTab, update, delete, deleteByTab), following `placements.js` pattern
+- `src/ui/connection.js` — SVG `<path>` rendering with quadratic bezier curves per spec formula (`CURVE_FACTOR = 0.25`)
+  - `createConnectionElement`: renders `<g>` with invisible hit area path (16px stroke for easy clicking) and visible styled path
+  - `updateConnectionPath`: recalculates bezier curve when endpoints move (card drag, group drag/resize)
+  - `nearestBorderPoint`: anchors connection lines to the nearest point on source/target bounding box border
+  - `bezierMidpoint`: computes B(0.5) for label pill placement
+  - `showHandles`/`hideHandles`: four circular SVG handles at edge midpoints of cards/groups on hover
+  - `buildPreviewPath`: generates dashed preview curve during drag-to-create
+  - `getHandleAnchor`: returns canvas-space coordinates for a given edge handle
+  - `CONNECTION_COLORS`: eight fixed palette colors per spec (red, orange, yellow, green, blue, purple, pink, gray)
+- Connection handles: four circular handles appear at edge midpoints when hovering a card or group; hidden during drag
+- Draw connection: drag from any handle → dashed curved preview line follows cursor → target highlights on hover → release on valid target creates connection; release on canvas cancels
+- Self-connections rejected (same source and target)
+- Label rendering: optional pill badge (`<foreignObject>` with `<span>`) at bezier midpoint, white/dark-mode background at 90% opacity, 1.5px border in connection color
+- Floating panel for connections: label text input (max 60 chars, placeholder "Optional label"), 8-color swatch selector (circular buttons with active ring), "Delete connection" button with trash icon
+- Canvas selection system extended with `'connection'` type; selected connections get thicker stroke (3.5px)
+- Connection paths refresh automatically after card move, group move, group resize (synchronous DOM update via `refreshConnectionPaths`)
+- Deleting a card placement or group also deletes all attached connections (with undo restore)
+- Tab deletion deletes all connections on the tab
+- Undo/redo commands for: connection create, connection label edit, connection color change, connection delete
+- CSS styles: connection path stroke, hit area, handles (opacity transition, crosshair cursor, green highlight for valid target), preview line (dashed), label pill badge, color swatches in floating panel
+
 ---
 
 ## What's Left
-
-### Increment 3 — Connections
-
-- `src/store/connections.js` — Full CRUD (create, get, getByTab, update, delete)
-- `src/ui/connection.js` — SVG `<path>` rendering with quadratic bezier curves per spec formula
-- Connection handles: four circular handles on card/group edges on hover
-- Draw connection: drag from handle → preview line → release on target creates connection
-- Label rendering: pill badge at path midpoint
-- Floating panel for connections: label input, 8-color swatch selector, delete button
-- Connection palette colors per spec (red, orange, yellow, green, blue, purple, pink, gray)
-- Undo/redo for connection create, edit label/color, delete
 
 ### Increment 4 — Card Photos
 

@@ -466,6 +466,97 @@ body {
   cursor: nesw-resize;
 }
 
+/* ── Connection (SVG) ── */
+.connection-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.connection-path {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.connection-path.selected {
+  stroke-width: 3.5;
+}
+
+.connection-handle {
+  fill: var(--focus-ring);
+  stroke: #fff;
+  stroke-width: 2;
+  cursor: crosshair;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.15s;
+}
+
+.connection-handle.visible {
+  opacity: 1;
+}
+
+.connection-handle.target-highlight {
+  opacity: 1;
+  fill: #16a34a;
+  r: 8;
+}
+
+.connection-preview {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+/* Connection label pill */
+.connection-label {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 10px;
+  background: var(--card-bg);
+  opacity: 0.9;
+  border-style: solid;
+  border-width: 1.5px;
+  color: var(--text-primary);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Color swatches in floating panel */
+.color-swatches {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--card-bg);
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

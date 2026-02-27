@@ -8,7 +8,7 @@ let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOrigin = { x: 0, y: 0 };
 let selectedId = null;
-let selectionType = null; // 'card' or 'group'
+let selectionType = null; // 'card', 'group', or 'connection'
 let callbacks = {};
 
 export function initCanvas(cbs) {
@@ -184,6 +184,19 @@ export function setSelection(id, type = 'card') {
       const rect = g.querySelector('.group-rect');
       if (rect) {
         rect.classList.toggle('selected', type === 'group' && g.dataset.groupId === id);
+      }
+    }
+  }
+
+  // Update visual selection state on all connections
+  const connectionLayer = document.getElementById('connection-layer');
+  if (connectionLayer) {
+    for (const g of connectionLayer.children) {
+      if (g.classList.contains('connection-group')) {
+        const path = g.querySelector('.connection-path');
+        if (path) {
+          path.classList.toggle('selected', type === 'connection' && g.dataset.connectionId === id);
+        }
       }
     }
   }

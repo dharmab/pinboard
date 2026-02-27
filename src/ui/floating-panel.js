@@ -1,6 +1,9 @@
+import { CONNECTION_COLORS } from './connection.js';
+
 let panelEl;
 let currentPlacementId = null;
 let currentGroupId = null;
+let currentConnectionId = null;
 let callbacks = {};
 
 export function initFloatingPanel(cbs) {
@@ -20,6 +23,7 @@ export function initFloatingPanel(cbs) {
 export function showCardPanel(placementId, card, screenX, screenY) {
   currentPlacementId = placementId;
   currentGroupId = null;
+  currentConnectionId = null;
 
   panelEl.innerHTML = '';
   panelEl.setAttribute('aria-label', 'Card properties');
@@ -115,6 +119,7 @@ function positionPanel(screenX, screenY) {
 export function showGroupPanel(groupId, group, screenX, screenY) {
   currentPlacementId = null;
   currentGroupId = groupId;
+  currentConnectionId = null;
 
   panelEl.innerHTML = '';
   panelEl.setAttribute('aria-label', 'Group properties');
@@ -158,10 +163,92 @@ export function showGroupPanel(groupId, group, screenX, screenY) {
   panelEl.classList.add('visible');
 }
 
+export function showConnectionPanel(connectionId, connection, screenX, screenY) {
+  currentPlacementId = null;
+  currentGroupId = null;
+  currentConnectionId = connectionId;
+
+  panelEl.innerHTML = '';
+  panelEl.setAttribute('aria-label', 'Connection properties');
+
+  // Label field
+  const labelField = document.createElement('div');
+  labelField.className = 'panel-field';
+  const labelLabel = document.createElement('label');
+  labelLabel.textContent = 'Label';
+  const labelInput = document.createElement('input');
+  labelInput.type = 'text';
+  labelInput.value = connection.label || '';
+  labelInput.maxLength = 60;
+  labelInput.placeholder = 'Optional label';
+  labelInput.addEventListener('blur', () => {
+    const newLabel = labelInput.value.trim() || null;
+    const oldLabel = connection.label;
+    if (newLabel !== oldLabel) {
+      callbacks.onConnectionLabelChange(connectionId, oldLabel, newLabel);
+      connection.label = newLabel;
+    }
+  });
+  labelInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') labelInput.blur();
+  });
+  labelField.append(labelLabel, labelInput);
+
+  // Color swatches
+  const colorField = document.createElement('div');
+  colorField.className = 'panel-field';
+  const colorLabel = document.createElement('label');
+  colorLabel.textContent = 'Color';
+  const swatches = document.createElement('div');
+  swatches.className = 'color-swatches';
+
+  for (const [key, hex] of Object.entries(CONNECTION_COLORS)) {
+    const swatch = document.createElement('button');
+    swatch.className = 'color-swatch';
+    swatch.style.background = hex;
+    swatch.setAttribute('aria-label', key);
+    swatch.title = key;
+    if (key === connection.color) {
+      swatch.classList.add('active');
+    }
+    swatch.addEventListener('click', () => {
+      const oldColor = connection.color;
+      if (key !== oldColor) {
+        callbacks.onConnectionColorChange(connectionId, oldColor, key);
+        connection.color = key;
+        // Update active state
+        for (const s of swatches.children) {
+          s.classList.toggle('active', s.getAttribute('aria-label') === key);
+        }
+      }
+    });
+    swatches.appendChild(swatch);
+  }
+  colorField.append(colorLabel, swatches);
+
+  // Delete button
+  const actions = document.createElement('div');
+  actions.className = 'panel-actions';
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'panel-remove-btn';
+  deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete connection`;
+  deleteBtn.addEventListener('click', () => {
+    callbacks.onDeleteConnection(connectionId);
+    hidePanel();
+  });
+  actions.appendChild(deleteBtn);
+
+  panelEl.append(labelField, colorField, actions);
+
+  positionPanel(screenX, screenY);
+  panelEl.classList.add('visible');
+}
+
 export function hidePanel() {
   panelEl.classList.remove('visible');
   currentPlacementId = null;
   currentGroupId = null;
+  currentConnectionId = null;
 }
 
 export function getCurrentPlacementId() {
