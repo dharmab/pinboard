@@ -1,5 +1,6 @@
 const NS = 'http://www.w3.org/2000/svg';
-const CURVE_FACTOR = 0.25;
+const GRAVITY_SAG = 0.35; // how much the curve droops downward relative to distance
+const MIN_SAG = 20; // minimum sag in pixels so short connections still curve
 const HANDLE_RADIUS = 10;
 
 export const CONNECTION_COLORS = {
@@ -43,29 +44,44 @@ function rectCenter(rect) {
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 }
 
-// Build SVG path string for a quadratic bezier between two points
-function buildPath(ax, ay, bx, by) {
+// Compute gravity-affected control point for a quadratic bezier.
+// The curve always sags downward (positive Y in SVG), and the amount of sag
+// scales with the horizontal distance between endpoints.
+function controlPoint(ax, ay, bx, by) {
   const midX = (ax + bx) / 2;
   const midY = (ay + by) / 2;
   const dx = bx - ax;
   const dy = by - ay;
-  const cx = midX + (-dy * CURVE_FACTOR);
-  const cy = midY + (dx * CURVE_FACTOR);
-  return { d: `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`, mx: cx, my: cy, midX, midY };
+  const dist = Math.hypot(dx, dy);
+
+  // Gravity sag: always pushes downward (positive Y in SVG coordinate space)
+  const sag = Math.max(MIN_SAG, dist * GRAVITY_SAG);
+
+  // For mostly-vertical connections, add a slight horizontal offset so the
+  // curve doesn't collapse into a straight line. The offset direction is
+  // consistent: rightward when going down, leftward when going up.
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+  let horizOffset = 0;
+  if (absDy > absDx * 2) {
+    horizOffset = (dy >= 0 ? 1 : -1) * sag * 0.3;
+  }
+
+  return { x: midX + horizOffset, y: midY + sag };
+}
+
+// Build SVG path string for a quadratic bezier between two points
+function buildPath(ax, ay, bx, by) {
+  const cp = controlPoint(ax, ay, bx, by);
+  return { d: `M ${ax} ${ay} Q ${cp.x} ${cp.y} ${bx} ${by}`, mx: cp.x, my: cp.y };
 }
 
 // Get the midpoint of the quadratic bezier (at t=0.5)
 function bezierMidpoint(ax, ay, bx, by) {
-  const midX = (ax + bx) / 2;
-  const midY = (ay + by) / 2;
-  const dx = bx - ax;
-  const dy = by - ay;
-  const cx = midX + (-dy * CURVE_FACTOR);
-  const cy = midY + (dx * CURVE_FACTOR);
-  // B(0.5) = (1-t)^2 * P0 + 2(1-t)t * C + t^2 * P1
+  const cp = controlPoint(ax, ay, bx, by);
   const t = 0.5;
-  const x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cx + t * t * bx;
-  const y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cy + t * t * by;
+  const x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cp.x + t * t * bx;
+  const y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cp.y + t * t * by;
   return { x, y };
 }
 
