@@ -74,6 +74,8 @@ body {
 
 /* ── Toolbar ── */
 #toolbar {
+  position: relative;
+  z-index: 100;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -82,7 +84,6 @@ body {
   background: var(--toolbar-bg);
   border-bottom: 1px solid var(--toolbar-border);
   flex-shrink: 0;
-  z-index: 10;
 }
 
 #toolbar .toolbar-group {
@@ -192,7 +193,8 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 0 16px;
+  gap: 4px;
+  padding: 0 8px 0 12px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -200,6 +202,34 @@ body {
   cursor: pointer;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
+}
+
+.tab-button:not(:has(.tab-close)) {
+  padding: 0 12px;
+}
+
+.tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 4px;
+  opacity: 0;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.tab-button:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--danger-color);
+  color: #fff;
+  opacity: 1;
 }
 
 .tab-button:hover {
@@ -211,6 +241,14 @@ body {
   color: var(--text-primary);
   font-weight: 600;
   border-bottom-color: var(--tab-active-border);
+}
+
+.tab-button[aria-selected="true"] .tab-close {
+  opacity: 0.5;
+}
+
+.tab-button[aria-selected="true"]:hover .tab-close {
+  opacity: 1;
 }
 
 .tab-add {
@@ -828,10 +866,39 @@ body {
   color: var(--text-primary);
 }
 
+.card-library-search {
+  padding: 12px 20px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.card-library-search-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--canvas-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.card-library-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.card-library-search-input:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 25%, transparent);
+}
+
 .card-library-body {
   overflow-y: auto;
   padding: 12px 20px;
   flex: 1;
+  min-height: 0;
 }
 
 .card-library-empty {

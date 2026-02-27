@@ -47,7 +47,7 @@ export function initToolbar(callbacks) {
 
   const addCardBtn = makeBtn('Add Card', icon(ICONS.plus) + ' Card', () => callbacks.onAddCard());
   const addGroupBtn = makeBtn('New Group', icon(ICONS.group) + ' Group', () => callbacks.onAddGroup());
-  const cardsBtn = makeBtn('Card Library', icon(ICONS.cards), () => callbacks.onCardLibrary());
+  const cardsBtn = makeBtn('Card Library', icon(ICONS.cards) + ' All Cards', () => callbacks.onCardLibrary());
 
   // Export dropdown
   const exportContainer = document.createElement('div');

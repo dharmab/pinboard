@@ -33,9 +33,21 @@ export async function showCardLibrary(cards, getImageUrl, cbs) {
   closeBtn.addEventListener('click', () => closeCardLibrary());
   header.append(title, closeBtn);
 
+  // Search bar
+  const searchBar = document.createElement('div');
+  searchBar.className = 'card-library-search';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search cards\u2026';
+  searchInput.className = 'card-library-search-input';
+  searchInput.setAttribute('aria-label', 'Search cards');
+  searchBar.appendChild(searchInput);
+
   // Body
   const body = document.createElement('div');
   body.className = 'card-library-body';
+
+  const allItems = [];
 
   if (cards.length === 0) {
     const empty = document.createElement('div');
@@ -95,6 +107,8 @@ export async function showCardLibrary(cards, getImageUrl, cbs) {
           () => {
             callbacks.onDeleteCard(card.id);
             item.remove();
+            const idx = allItems.indexOf(item);
+            if (idx !== -1) allItems.splice(idx, 1);
             // Check if list is now empty
             if (list.children.length === 0) {
               body.innerHTML = '';
@@ -121,13 +135,24 @@ export async function showCardLibrary(cards, getImageUrl, cbs) {
         e.dataTransfer.effectAllowed = 'copy';
       });
 
+      allItems.push(item);
       list.appendChild(item);
     }
 
     body.appendChild(list);
+
+    // Filter items as user types
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase().trim();
+      for (const item of allItems) {
+        const title = item.querySelector('.card-library-item-title')?.textContent.toLowerCase() || '';
+        const desc = item.querySelector('.card-library-item-desc')?.textContent.toLowerCase() || '';
+        item.style.display = (!query || title.includes(query) || desc.includes(query)) ? '' : 'none';
+      }
+    });
   }
 
-  panel.append(header, body);
+  panel.append(header, searchBar, body);
   overlayEl.appendChild(panel);
 
   // Click outside panel to close

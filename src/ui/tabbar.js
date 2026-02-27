@@ -19,12 +19,29 @@ export function renderTabs(tabs, currentTabId) {
     btn.className = 'tab-button';
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', tab.id === activeTabId ? 'true' : 'false');
-    btn.textContent = tab.name;
     btn.dataset.tabId = tab.id;
-
     btn.draggable = true;
 
-    btn.addEventListener('click', () => {
+    const label = document.createElement('span');
+    label.className = 'tab-label';
+    label.textContent = tab.name;
+    btn.appendChild(label);
+
+    // Close button (visible on hover, hidden if last tab)
+    if (tabs.length > 1) {
+      const closeBtn = document.createElement('span');
+      closeBtn.className = 'tab-close';
+      closeBtn.setAttribute('aria-label', 'Close tab');
+      closeBtn.textContent = '\u00d7';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        callbacks.onDeleteTab(tab.id);
+      });
+      btn.appendChild(closeBtn);
+    }
+
+    btn.addEventListener('click', (e) => {
+      if (e.target.closest('.tab-close')) return;
       if (tab.id !== activeTabId) {
         callbacks.onSwitchTab(tab.id);
       }
@@ -32,6 +49,7 @@ export function renderTabs(tabs, currentTabId) {
 
     btn.addEventListener('dblclick', (e) => {
       e.stopPropagation();
+      if (e.target.closest('.tab-close')) return;
       startRename(btn, tab);
     });
 
@@ -117,6 +135,9 @@ export function renderTabs(tabs, currentTabId) {
 }
 
 function startRename(btn, tab) {
+  const label = btn.querySelector('.tab-label');
+  if (!label) return;
+
   const input = document.createElement('input');
   input.className = 'tab-rename-input';
   input.type = 'text';
@@ -144,8 +165,8 @@ function startRename(btn, tab) {
     }
   });
 
-  btn.textContent = '';
-  btn.appendChild(input);
+  label.textContent = '';
+  label.appendChild(input);
   input.focus();
   input.select();
 }
