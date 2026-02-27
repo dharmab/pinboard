@@ -1,19 +1,22 @@
 import { initTheme, toggleTheme } from './ui/theme.js';
-import { initToolbar, updateZoomDisplay } from './ui/toolbar.js';
+import { initToolbar, updateZoomDisplay, updateBoardNameDisplay } from './ui/toolbar.js';
 import { initTabBar, renderTabs } from './ui/tabbar.js';
 import { initCanvas, getViewport, setViewport, zoomIn, zoomOut, zoomReset, fitAll, setSelection, getSvg } from './ui/canvas.js';
 import { initFloatingPanel, showCardPanel, showGroupPanel, showConnectionPanel, hidePanel, getCurrentPlacementId } from './ui/floating-panel.js';
+import { showContextMenu, closeContextMenu, showConfirmDialog } from './ui/context-menu.js';
+import { showCardLibrary, closeCardLibrary } from './ui/card-library.js';
+import { showBoardSwitcher, closeBoardSwitcher } from './ui/board-switcher.js';
 import { createCardElement, updateCardElement, adjustCardHeight, getCardRect } from './ui/card.js';
 import { createGroupElement, updateGroupElement, getGroupRect } from './ui/group.js';
 import { createConnectionElement, updateConnectionPath, showHandles, hideHandles, buildPreviewPath, getHandleAnchor } from './ui/connection.js';
 import { createBoard, getBoard, getAllBoards, updateBoardName } from './store/board.js';
-import { createCard, getCard, updateCard } from './store/cards.js';
+import { createCard, getCard, getCardsByBoard, updateCard, deleteCard } from './store/cards.js';
 import { createTab, getTabsByBoard, updateTab, deleteTab as deleteTabStore } from './store/tabs.js';
-import { createPlacement, getPlacement, getPlacementsByTab, updatePlacement, deletePlacement } from './store/placements.js';
+import { createPlacement, getPlacement, getPlacementsByTab, getPlacementsByCard, updatePlacement, deletePlacement } from './store/placements.js';
 import { createGroup, getGroup, getGroupsByTab, updateGroup, deleteGroup } from './store/groups.js';
 import { createConnection, getConnection, getConnectionsByTab, updateConnection, deleteConnection, deleteConnectionsByTab } from './store/connections.js';
-import { saveImage, getImage } from './store/images.js';
-import { dbPut } from './store/db.js';
+import { saveImage, getImage, deleteImage } from './store/images.js';
+import { dbPut, dbDelete } from './store/db.js';
 import { executeCommand, undo, redo } from './utils/history.js';
 import { clientToCanvas } from './utils/geometry.js';
 
@@ -57,6 +60,8 @@ async function init() {
     onRedo: () => redo(),
     onAddCard: () => addCardAtCenter(),
     onAddGroup: () => addGroupAtCenter(),
+    onCardLibrary: () => openCardLibrary(),
+    onBoardSwitcher: () => openBoardSwitcher(),
     onZoomIn: () => zoomIn(),
     onZoomOut: () => zoomOut(),
     onZoomReset: () => zoomReset(),
@@ -155,10 +160,25 @@ async function init() {
   // Set up connection handle hover + drag on the SVG
   setupConnectionInteraction();
 
-  // Prevent browser default file drop behavior on canvas
+  // Handle drag-and-drop on canvas (card library + prevent default file drops)
   const canvasContainer = document.getElementById('canvas-container');
-  canvasContainer.addEventListener('dragover', (e) => e.preventDefault());
-  canvasContainer.addEventListener('drop', (e) => e.preventDefault());
+  canvasContainer.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.types.includes('application/x-pinboard-card')) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  });
+  canvasContainer.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const cardId = e.dataTransfer.getData('application/x-pinboard-card');
+    if (cardId) {
+      closeCardLibrary();
+      const svg = getSvg();
+      const vp = getViewport();
+      const pos = clientToCanvas(svg, e.clientX, e.clientY, vp);
+      await placeCardFromLibrary(cardId, pos.x, pos.y);
+    }
+  });
 
   // Render initial state
   renderTabs(tabs, currentTabId);
@@ -329,6 +349,68 @@ async function removePlacement(placementId) {
   announce(`Card "${card?.title}" removed from tab`);
 }
 
+async function placeCardFromLibrary(cardId, x, y) {
+  // Check if card already has a placement on this tab
+  const existingPlacements = await getPlacementsByTab(currentTabId);
+  if (existingPlacements.some(p => p.card_id === cardId)) {
+    announce('Card already exists on this tab');
+    return;
+  }
+
+  const card = await getCard(cardId);
+  if (!card) return;
+
+  const placement = await createPlacement(currentTabId, cardId, x, y);
+  const imgUrl = await getImageUrl(card.image_filename);
+  const g = appendCardToLayer(placement, card, imgUrl);
+  adjustCardHeight(g);
+  setSelection(placement.id);
+  announce(`Card "${card.title}" added to tab`);
+
+  const placementId = placement.id;
+  executeCommand({
+    execute: async () => {
+      const existing = await getPlacement(placementId);
+      if (existing) return;
+      await dbPut('placements', placement);
+      await renderPlacements();
+    },
+    undo: async () => {
+      await deletePlacement(placementId);
+      await renderPlacements();
+      setSelection(null);
+      hidePanel();
+    },
+  });
+}
+
+async function deleteCardEverywhere(cardId) {
+  const card = await getCard(cardId);
+  if (!card) return;
+
+  // Delete all placements for this card (across all tabs)
+  const allPlacements = await getPlacementsByCard(cardId);
+  for (const p of allPlacements) {
+    // Delete connections attached to each placement
+    const tabConns = await getConnectionsByTab(p.tab_id);
+    for (const conn of tabConns) {
+      if ((conn.from_type === 'card' && conn.from_id === p.id) ||
+          (conn.to_type === 'card' && conn.to_id === p.id)) {
+        await deleteConnection(conn.id);
+      }
+    }
+    await deletePlacement(p.id);
+  }
+  await deleteCard(cardId);
+
+  // Re-render current tab
+  await renderPlacements();
+  await renderConnections();
+  setSelection(null);
+  hidePanel();
+  announce(`Card "${card.title}" deleted`);
+}
+
 function appendCardToLayer(placement, card, imageUrl) {
   const cardLayer = document.getElementById('card-layer');
   const g = createCardElement(placement, card, {
@@ -387,6 +469,40 @@ function appendCardToLayer(placement, card, imageUrl) {
       });
     },
   }, imageUrl);
+
+  // Right-click context menu
+  g.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showContextMenu(e.clientX, e.clientY, [
+      {
+        label: 'Edit',
+        onClick: async () => {
+          const cardData = await getCard(card.id);
+          if (!cardData) return;
+          setSelection(placement.id, 'card');
+          const cardImageUrl = await getImageUrl(cardData.image_filename);
+          const gRect = g.getBoundingClientRect();
+          showCardPanel(placement.id, cardData, gRect.right + 8, gRect.top, cardImageUrl);
+        },
+      },
+      {
+        label: 'Remove from this tab',
+        onClick: () => removePlacement(placement.id),
+      },
+      'separator',
+      {
+        label: 'Delete card everywhere',
+        danger: true,
+        onClick: () => {
+          showConfirmDialog(
+            `Delete "${card.title}" from all tabs? This cannot be undone.`,
+            () => deleteCardEverywhere(card.id)
+          );
+        },
+      },
+    ]);
+  });
 
   // Set up drop-to-attach-photo
   const contentDiv = g.querySelector('.card-content');
@@ -619,6 +735,37 @@ function appendGroupToLayer(group) {
       });
     },
   });
+  // Right-click context menu
+  g.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showContextMenu(e.clientX, e.clientY, [
+      {
+        label: 'Rename',
+        onClick: async () => {
+          const grp = await getGroup(group.id);
+          if (!grp) return;
+          setSelection(group.id, 'group');
+          const el = groupLayer.querySelector(`[data-group-id="${group.id}"]`);
+          if (el) {
+            const elRect = el.getBoundingClientRect();
+            showGroupPanel(group.id, grp, elRect.right + 8, elRect.top);
+            // Focus the label input in the panel
+            setTimeout(() => {
+              const input = document.querySelector('.floating-panel input[type="text"]');
+              if (input) input.focus();
+            }, 0);
+          }
+        },
+      },
+      {
+        label: 'Delete group',
+        danger: true,
+        onClick: () => deleteGroupAction(group.id),
+      },
+    ]);
+  });
+
   groupLayer.appendChild(g);
 
   // Also reset drag offsets when group is done being built
@@ -822,6 +969,24 @@ async function renderConnections() {
     const g = createConnectionElement(conn, fromRect, toRect, {
       onConnectionSelected: (connId) => selectConnection(connId),
     });
+
+    // Right-click context menu
+    g.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: 'Edit',
+          onClick: () => selectConnection(conn.id),
+        },
+        {
+          label: 'Delete connection',
+          danger: true,
+          onClick: () => deleteConnectionAction(conn.id),
+        },
+      ]);
+    });
+
     connectionLayer.appendChild(g);
   }
 }
@@ -1103,6 +1268,151 @@ async function onHandleDragEnd(e) {
   });
 
   connectionSource = null;
+}
+
+// ── Card Library ──
+
+async function openCardLibrary() {
+  const cards = await getCardsByBoard(currentBoard.id);
+  await showCardLibrary(cards, getImageUrl, {
+    onDeleteCard: (cardId) => deleteCardEverywhere(cardId),
+    onClose: () => {},
+  });
+}
+
+// ── Board Switcher ──
+
+async function openBoardSwitcher() {
+  const boards = await getAllBoards();
+  showBoardSwitcher(boards, currentBoard.id, {
+    onSwitch: (boardId) => switchBoard(boardId),
+    onCreateBoard: () => createNewBoard(),
+    onDuplicateBoard: (boardId) => duplicateBoard(boardId),
+    onDeleteBoard: (boardId) => deleteBoardAction(boardId),
+  });
+}
+
+async function switchBoard(boardId) {
+  const board = await getBoard(boardId);
+  if (!board) return;
+
+  currentBoard = board;
+  updateBoardNameDisplay(board.name);
+
+  const tabs = await getTabsByBoard(board.id);
+  if (tabs.length === 0) {
+    await createTab(board.id, 'Tab 1', 0);
+    const newTabs = await getTabsByBoard(board.id);
+    currentTabId = newTabs[0].id;
+    renderTabs(newTabs, currentTabId);
+  } else {
+    currentTabId = tabs[0].id;
+    renderTabs(tabs, currentTabId);
+  }
+
+  await renderPlacements();
+  await renderGroups();
+  await renderConnections();
+  setSelection(null);
+  hidePanel();
+  setViewport({ x: 0, y: 0, zoom: 1.0 });
+  updateZoomDisplay(1.0);
+}
+
+async function createNewBoard() {
+  const board = await createBoard('New Board');
+  await createTab(board.id, 'Tab 1', 0);
+  await switchBoard(board.id);
+}
+
+async function duplicateBoard(boardId) {
+  const sourceBoard = await getBoard(boardId);
+  if (!sourceBoard) return;
+
+  const newBoard = await createBoard(sourceBoard.name + ' (copy)');
+
+  // Duplicate all cards
+  const sourceCards = await getCardsByBoard(boardId);
+  const cardIdMap = new Map(); // old card id -> new card id
+  for (const card of sourceCards) {
+    const newCard = await createCard(newBoard.id, card.title, card.description);
+    if (card.image_filename) {
+      await updateCard(newCard.id, { image_filename: card.image_filename });
+    }
+    cardIdMap.set(card.id, newCard.id);
+  }
+
+  // Duplicate all tabs, placements, groups, connections
+  const sourceTabs = await getTabsByBoard(boardId);
+  for (const tab of sourceTabs) {
+    const newTab = await createTab(newBoard.id, tab.name, tab.order);
+
+    // Duplicate groups
+    const sourceGroups = await getGroupsByTab(tab.id);
+    const groupIdMap = new Map();
+    for (const group of sourceGroups) {
+      const newGroup = await createGroup(newTab.id, group.label, group.x, group.y);
+      await updateGroup(newGroup.id, { width: group.width, height: group.height });
+      groupIdMap.set(group.id, newGroup.id);
+    }
+
+    // Duplicate placements
+    const sourcePlacements = await getPlacementsByTab(tab.id);
+    const placementIdMap = new Map();
+    for (const p of sourcePlacements) {
+      const newCardId = cardIdMap.get(p.card_id);
+      if (!newCardId) continue;
+      const newPlacement = await createPlacement(newTab.id, newCardId, p.x, p.y);
+      if (p.group_id) {
+        const newGroupId = groupIdMap.get(p.group_id);
+        if (newGroupId) await updatePlacement(newPlacement.id, { group_id: newGroupId });
+      }
+      placementIdMap.set(p.id, newPlacement.id);
+    }
+
+    // Duplicate connections
+    const sourceConns = await getConnectionsByTab(tab.id);
+    for (const conn of sourceConns) {
+      let fromId = conn.from_id;
+      let toId = conn.to_id;
+      if (conn.from_type === 'card') fromId = placementIdMap.get(conn.from_id) || conn.from_id;
+      if (conn.from_type === 'group') fromId = groupIdMap.get(conn.from_id) || conn.from_id;
+      if (conn.to_type === 'card') toId = placementIdMap.get(conn.to_id) || conn.to_id;
+      if (conn.to_type === 'group') toId = groupIdMap.get(conn.to_id) || conn.to_id;
+
+      const newConn = await createConnection(newTab.id, conn.from_type, fromId, conn.to_type, toId);
+      if (conn.label || conn.color !== 'red') {
+        await updateConnection(newConn.id, { label: conn.label, color: conn.color });
+      }
+    }
+  }
+
+  await switchBoard(newBoard.id);
+}
+
+async function deleteBoardAction(boardId) {
+  const boards = await getAllBoards();
+  if (boards.length <= 1) return;
+
+  // Delete all data for this board
+  const tabs = await getTabsByBoard(boardId);
+  for (const tab of tabs) {
+    const placements = await getPlacementsByTab(tab.id);
+    for (const p of placements) await deletePlacement(p.id);
+    const groups = await getGroupsByTab(tab.id);
+    for (const g of groups) await deleteGroup(g.id);
+    await deleteConnectionsByTab(tab.id);
+    await deleteTabStore(tab.id);
+  }
+  const cards = await getCardsByBoard(boardId);
+  for (const card of cards) await deleteCard(card.id);
+  await dbDelete('boards', boardId);
+
+  // Switch to another board
+  const remainingBoards = await getAllBoards();
+  if (currentBoard.id === boardId) {
+    await switchBoard(remainingBoards[0].id);
+  }
 }
 
 init().catch(console.error);

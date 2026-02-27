@@ -1,3 +1,5 @@
+import { showContextMenu, closeContextMenu } from './context-menu.js';
+
 let tabbarEl;
 let activeTabId = null;
 let callbacks = {};
@@ -82,47 +84,21 @@ function startRename(btn, tab) {
 }
 
 function showTabContextMenu(e, tab, tabCount) {
-  closeContextMenu();
-
-  const menu = document.createElement('div');
-  menu.className = 'tab-context-menu';
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
-
-  const renameItem = document.createElement('button');
-  renameItem.textContent = 'Rename';
-  renameItem.addEventListener('click', () => {
-    closeContextMenu();
-    const btn = tabbarEl.querySelector(`[data-tab-id="${tab.id}"]`);
-    if (btn) startRename(btn, tab);
-  });
-
-  const deleteItem = document.createElement('button');
-  deleteItem.textContent = 'Delete Tab';
-  deleteItem.disabled = tabCount <= 1;
-  deleteItem.addEventListener('click', () => {
-    closeContextMenu();
-    callbacks.onDeleteTab(tab.id);
-  });
-
-  menu.append(renameItem, deleteItem);
-  document.body.appendChild(menu);
-
-  const closeOnClick = (ev) => {
-    if (!menu.contains(ev.target)) {
-      closeContextMenu();
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeOnClick, { once: true }), 0);
-  menu._cleanup = () => document.removeEventListener('click', closeOnClick);
-}
-
-function closeContextMenu() {
-  const existing = document.querySelector('.tab-context-menu');
-  if (existing) {
-    if (existing._cleanup) existing._cleanup();
-    existing.remove();
-  }
+  showContextMenu(e.clientX, e.clientY, [
+    {
+      label: 'Rename',
+      onClick: () => {
+        const btn = tabbarEl.querySelector(`[data-tab-id="${tab.id}"]`);
+        if (btn) startRename(btn, tab);
+      },
+    },
+    {
+      label: 'Delete Tab',
+      disabled: tabCount <= 1,
+      danger: true,
+      onClick: () => callbacks.onDeleteTab(tab.id),
+    },
+  ]);
 }
 
 export function getActiveTabId() {

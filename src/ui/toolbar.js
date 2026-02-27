@@ -17,10 +17,15 @@ const ICONS = {
   sun: 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42',
   moon: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z',
   group: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z',
+  boards: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  cards: 'M21 3H3a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zM9 7h6M9 11h6M9 15h4',
 };
 
 export function initToolbar(callbacks) {
   const toolbar = document.getElementById('toolbar');
+
+  // Board switcher button
+  const boardSwitcherBtn = makeBtn('Boards', icon(ICONS.boards), () => callbacks.onBoardSwitcher());
 
   const boardName = document.createElement('input');
   boardName.type = 'text';
@@ -41,6 +46,7 @@ export function initToolbar(callbacks) {
 
   const addCardBtn = makeBtn('Add Card', icon(ICONS.plus) + ' Card', () => callbacks.onAddCard());
   const addGroupBtn = makeBtn('New Group', icon(ICONS.group) + ' Group', () => callbacks.onAddGroup());
+  const cardsBtn = makeBtn('Card Library', icon(ICONS.cards), () => callbacks.onCardLibrary());
 
   const sep3 = separator();
 
@@ -65,9 +71,9 @@ export function initToolbar(callbacks) {
   themeBtn.innerHTML = getCurrentTheme() === 'dark' ? icon(ICONS.sun) : icon(ICONS.moon);
 
   toolbar.append(
-    boardName, sep1,
+    boardSwitcherBtn, boardName, sep1,
     undoBtn, redoBtn, sep2,
-    addCardBtn, addGroupBtn, sep3,
+    addCardBtn, addGroupBtn, cardsBtn, sep3,
     spacer,
     zoomOutBtn, zoomDisplay, zoomInBtn, fitAllBtn, sep4,
     themeBtn

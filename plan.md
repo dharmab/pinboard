@@ -130,20 +130,26 @@
 - Undo/redo commands for: photo attach (captures old hash, toggles `image_filename`), photo remove (same pattern)
 - CSS: `.card-photo` (negative margins, 140px height, overflow hidden, rounded top), `.card-photo-overlay` (absolute positioned, opacity transition on hover), `.card-photo-broken` (background fill + SVG placeholder icon via data URL), `.card-drop-target` (focus ring highlight), `.panel-thumbnail`, `.panel-photo-buttons`, `.panel-btn` / `.panel-btn-danger` button styles
 
+### Context Menus & Card Library (Increment 5)
+
+- `src/ui/context-menu.js` — Generic reusable context menu module with `showContextMenu(x, y, items)` and `closeContextMenu()`; supports separator items, disabled items, and danger-styled items; `showConfirmDialog(message, onConfirm)` for destructive action confirmation with modal overlay
+- Tab bar refactored to use shared context-menu module instead of its own inline implementation
+- Card context menu (right-click): Edit (selects card and opens floating panel), Remove from this tab (same as floating panel action), Delete card everywhere (with confirmation dialog — permanently removes card, all placements, and all attached connections across all tabs; not undoable)
+- Group context menu (right-click): Rename (selects group, opens floating panel, auto-focuses label input), Delete group (same as floating panel action, with danger styling)
+- Connection context menu (right-click): Edit (selects connection and opens floating panel), Delete connection (same as floating panel action, with danger styling)
+- `src/ui/card-library.js` — Full-screen overlay (`z-index: 150`) listing all cards in the current board; each row shows 40×40 thumbnail (or placeholder), title, truncated description, and a trash button for global deletion; cards are `draggable` with `application/x-pinboard-card` data transfer type; closes on click-outside or close button
+- Canvas drop handler for card library: on receiving `application/x-pinboard-card` data, closes the library overlay, converts drop coordinates to canvas space, and creates a placement (with undo); skips if the card already exists on the current tab
+- `deleteCardEverywhere` function: deletes all placements across all tabs (and their attached connections), then deletes the card record; re-renders current tab; not wrapped in undo (spec says global card deletion is not undoable)
+- `src/ui/board-switcher.js` — Dropdown panel anchored below the toolbar listing all boards; active board highlighted; each board row has duplicate and delete action buttons (visible on hover); "+ New" button in header creates a board and switches to it; clicking a board switches to it; delete requires confirmation and is blocked if only one board exists
+- Toolbar updated with "Boards" button (grid icon, opens board switcher), "Card Library" button (document icon, opens card library), placed alongside existing Add Card and New Group buttons
+- `switchBoard` function: loads a different board, resets viewport, re-renders tabs/placements/groups/connections, updates the board name input display
+- `duplicateBoard` function: deep copies all cards (with image hash references preserved), tabs, placements (with group membership), groups (with dimensions), and connections (with remapped IDs, labels, and colors) into a new board named "{name} (copy)"
+- `deleteBoardAction` function: cascading delete of all tabs, placements, groups, connections, and cards for the board; switches to the first remaining board
+- CSS: `.context-menu` shared styles (same visual treatment as tab context menu), `.context-menu-danger` (red text, red background on hover), `.context-menu-separator` (1px border line), `.confirm-overlay` + `.confirm-dialog` (centered modal with Cancel/Delete buttons), `.card-library-overlay` + `.card-library` (centered panel, max 720px wide, scrollable body), `.board-switcher` (fixed dropdown, 260px wide, item hover actions with opacity transition)
+
 ---
 
 ## What's Left
-
-### Increment 5 — Context Menus & Card Library
-
-- `src/ui/context-menu.js` — Right-click menus for cards, groups, connections per spec
-- Card context menu: Edit, Remove from tab, Delete everywhere (with confirmation)
-- Group context menu: Rename, Delete group
-- Connection context menu: Edit, Delete connection
-- `src/ui/card-library.js` — Full-screen overlay listing all cards in board
-- Drag card from library onto canvas to create placement
-- Delete card globally from library (confirmation required)
-- Board switcher in toolbar (create, rename, duplicate, delete, switch boards)
 
 ### Increment 6 — Import/Export
 
