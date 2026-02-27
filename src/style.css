@@ -418,6 +418,54 @@ body {
   color: #fff;
 }
 
+/* ── Group (SVG) ── */
+.group-rect {
+  fill: var(--group-fill);
+  stroke: var(--group-border);
+  stroke-width: 2;
+}
+
+.group-rect.selected {
+  stroke: var(--focus-ring);
+  stroke-width: 3;
+}
+
+.group-label {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--group-border);
+  pointer-events: auto;
+  cursor: text;
+  user-select: none;
+}
+
+.group-label-input {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: 1px solid var(--focus-ring);
+  border-radius: 3px;
+  padding: 0 2px;
+  background: var(--card-bg);
+  width: 100%;
+  outline: none;
+}
+
+.resize-handle {
+  fill: transparent;
+  stroke: none;
+}
+
+.resize-handle[data-corner="nw"],
+.resize-handle[data-corner="se"] {
+  cursor: nwse-resize;
+}
+
+.resize-handle[data-corner="ne"],
+.resize-handle[data-corner="sw"] {
+  cursor: nesw-resize;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

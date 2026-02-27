@@ -8,6 +8,7 @@ let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOrigin = { x: 0, y: 0 };
 let selectedId = null;
+let selectionType = null; // 'card' or 'group'
 let callbacks = {};
 
 export function initCanvas(cbs) {
@@ -161,21 +162,39 @@ function zoomToward(screenX, screenY, factor) {
   callbacks.onZoomChange?.(viewport.zoom);
 }
 
-export function setSelection(id) {
+export function setSelection(id, type = 'card') {
   selectedId = id;
+  selectionType = id ? type : null;
+
   // Update visual selection state on all cards
   const cardLayer = document.getElementById('card-layer');
-  if (!cardLayer) return;
-  for (const g of cardLayer.children) {
-    const content = g.querySelector('.card-content');
-    if (content) {
-      content.classList.toggle('selected', g.dataset.placementId === id);
+  if (cardLayer) {
+    for (const g of cardLayer.children) {
+      const content = g.querySelector('.card-content');
+      if (content) {
+        content.classList.toggle('selected', type === 'card' && g.dataset.placementId === id);
+      }
+    }
+  }
+
+  // Update visual selection state on all groups
+  const groupLayer = document.getElementById('group-layer');
+  if (groupLayer) {
+    for (const g of groupLayer.children) {
+      const rect = g.querySelector('.group-rect');
+      if (rect) {
+        rect.classList.toggle('selected', type === 'group' && g.dataset.groupId === id);
+      }
     }
   }
 }
 
 export function getSelection() {
   return selectedId;
+}
+
+export function getSelectionType() {
+  return selectionType;
 }
 
 export function getSvg() {

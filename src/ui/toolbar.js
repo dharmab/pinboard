@@ -16,6 +16,7 @@ const ICONS = {
   fitAll: 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7',
   sun: 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42',
   moon: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z',
+  group: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z',
 };
 
 export function initToolbar(callbacks) {
@@ -39,6 +40,7 @@ export function initToolbar(callbacks) {
   const sep2 = separator();
 
   const addCardBtn = makeBtn('Add Card', icon(ICONS.plus) + ' Card', () => callbacks.onAddCard());
+  const addGroupBtn = makeBtn('New Group', icon(ICONS.group) + ' Group', () => callbacks.onAddGroup());
 
   const sep3 = separator();
 
@@ -65,7 +67,7 @@ export function initToolbar(callbacks) {
   toolbar.append(
     boardName, sep1,
     undoBtn, redoBtn, sep2,
-    addCardBtn, sep3,
+    addCardBtn, addGroupBtn, sep3,
     spacer,
     zoomOutBtn, zoomDisplay, zoomInBtn, fitAllBtn, sep4,
     themeBtn

@@ -78,20 +78,25 @@
 - Card creation: store card → store placement → append SVG element → push undo command
 - Undo/redo commands for: card create, card move, card title edit, card description edit, remove from tab, delete tab
 
+### Groups (Increment 2)
+
+- `src/store/groups.js` — Full CRUD (create, get, getByTab, update, delete), following `placements.js` pattern
+- `src/ui/group.js` — SVG `<g>` rendering with `<rect>` (semi-transparent fill, rounded corners), `<text>` label, four corner resize handles
+- Group drag: moves group and all member cards in real time (member offsets pre-cached on `pointerdown` for synchronous DOM updates during `pointermove`)
+- Corner resize: min size 100×80, handles for all four corners with appropriate cursors
+- Double-click label for inline edit via temporary `<foreignObject>` input
+- Card-into-group membership: after card move, checks if card center overlaps any group's bounding box; sets or clears `placement.group_id` accordingly
+- Floating panel for groups: label text input (max 60 chars), "Delete group" button with trash icon
+- Toolbar "New Group" button (rectangle icon, placed next to "Add Card")
+- Canvas selection system extended with type parameter (`'card'` or `'group'`); groups highlight with focus-ring stroke when selected
+- Group deletion clears `group_id` on all member placements before removing the group record
+- Undo/redo commands for: group create, group move (compound with member card positions), group resize, group label edit, group delete (restores memberships), card membership changes
+- `fitAllElements()` includes group rects in bounding box calculation
+- Tab switching and deletion handle groups alongside placements
+
 ---
 
 ## What's Left
-
-### Increment 2 — Groups
-
-- `src/store/groups.js` — Full CRUD (create, get, getByTab, update, delete)
-- `src/ui/group.js` — SVG rendering (semi-transparent rect with label), resize handles
-- Group interaction: drag to move (moves all member cards), corner resize
-- Card-into-group: dragging a card into a group's bounding box sets `placement.group_id`; dragging out clears it
-- Floating panel for groups: label input, delete button
-- Toolbar "New Group" button
-- Rubber-band selection → "Group" action badge
-- Undo/redo for group create, move, resize, delete, membership changes
 
 ### Increment 3 — Connections
 
