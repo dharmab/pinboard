@@ -36,6 +36,7 @@ export function createCardElement(placement, card, callbacks, imageUrl) {
   g.dataset.placementId = placement.id;
   g.dataset.cardId = card.id;
   g.setAttribute('transform', `translate(${placement.x}, ${placement.y})`);
+  g.setAttribute('filter', 'url(#card-shadow)');
 
   const fo = document.createElementNS(NS, 'foreignObject');
   fo.setAttribute('width', CARD_WIDTH);
@@ -113,7 +114,7 @@ export function createCardElement(placement, card, callbacks, imageUrl) {
     if (hasMoved) {
       callbacks.onCardMoved(placement.id, elementStart.x, elementStart.y, placement.x, placement.y);
     } else {
-      callbacks.onCardSelected(placement.id, card.id);
+      callbacks.onCardSelected(placement.id, card.id, e.shiftKey);
     }
   });
 

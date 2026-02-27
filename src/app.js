@@ -1,7 +1,7 @@
 import { initTheme, toggleTheme } from './ui/theme.js';
 import { initToolbar, updateZoomDisplay, updateBoardNameDisplay } from './ui/toolbar.js';
 import { initTabBar, renderTabs } from './ui/tabbar.js';
-import { initCanvas, getViewport, setViewport, zoomIn, zoomOut, zoomReset, fitAll, setSelection, getSvg } from './ui/canvas.js';
+import { initCanvas, getViewport, setViewport, zoomIn, zoomOut, zoomReset, fitAll, setSelection, getSelectedIds, getSvg } from './ui/canvas.js';
 import { initFloatingPanel, showCardPanel, showGroupPanel, showConnectionPanel, hidePanel, getCurrentPlacementId } from './ui/floating-panel.js';
 import { showContextMenu, closeContextMenu, showConfirmDialog } from './ui/context-menu.js';
 import { showCardLibrary, closeCardLibrary } from './ui/card-library.js';
@@ -11,7 +11,7 @@ import { createGroupElement, updateGroupElement, getGroupRect } from './ui/group
 import { createConnectionElement, updateConnectionPath, showHandles, hideHandles, buildPreviewPath, getHandleAnchor } from './ui/connection.js';
 import { createBoard, getBoard, getAllBoards, updateBoardName } from './store/board.js';
 import { createCard, getCard, getCardsByBoard, updateCard, deleteCard } from './store/cards.js';
-import { createTab, getTabsByBoard, updateTab, deleteTab as deleteTabStore } from './store/tabs.js';
+import { createTab, getTabsByBoard, updateTab, deleteTab as deleteTabStore, reorderTabs } from './store/tabs.js';
 import { createPlacement, getPlacement, getPlacementsByTab, getPlacementsByCard, updatePlacement, deletePlacement } from './store/placements.js';
 import { createGroup, getGroup, getGroupsByTab, updateGroup, deleteGroup } from './store/groups.js';
 import { createConnection, getConnection, getConnectionsByTab, updateConnection, deleteConnection, deleteConnectionsByTab } from './store/connections.js';
@@ -83,6 +83,11 @@ async function init() {
     onAddTab: () => addTab(),
     onRenameTab: (tabId, name) => renameTab(tabId, name),
     onDeleteTab: (tabId) => removeTab(tabId),
+    onReorderTabs: async (orderedIds) => {
+      await reorderTabs(currentBoard.id, orderedIds);
+      const tabs = await getTabsByBoard(currentBoard.id);
+      renderTabs(tabs, currentTabId);
+    },
   });
 
   // Init canvas
@@ -451,17 +456,30 @@ function appendCardToLayer(placement, card, imageUrl) {
         },
       });
     },
-    onCardSelected: async (placementId, cardId) => {
-      setSelection(placementId, 'card');
+    onCardSelected: async (placementId, cardId, shiftKey) => {
+      setSelection(placementId, 'card', shiftKey);
+
+      const selected = getSelectedIds();
+      if (selected.size === 0) {
+        hidePanel();
+        announce('');
+        return;
+      }
+
       announce(`Selected: ${card.title}`);
 
-      // Position floating panel near the card
-      const cardData = await getCard(cardId);
-      const g = cardLayer.querySelector(`[data-placement-id="${placementId}"]`);
-      if (g && cardData) {
-        const cardImageUrl = await getImageUrl(cardData.image_filename);
-        const gRect = g.getBoundingClientRect();
-        showCardPanel(placementId, cardData, gRect.right + 8, gRect.top, cardImageUrl);
+      // Only show floating panel for single selection or the primary (last-clicked) card
+      if (!shiftKey || selected.size === 1) {
+        const cardData = await getCard(cardId);
+        const g = cardLayer.querySelector(`[data-placement-id="${placementId}"]`);
+        if (g && cardData) {
+          const cardImageUrl = await getImageUrl(cardData.image_filename);
+          const gRect = g.getBoundingClientRect();
+          showCardPanel(placementId, cardData, gRect.right + 8, gRect.top, cardImageUrl);
+        }
+      } else {
+        hidePanel();
+        announce(`${selected.size} cards selected`);
       }
     },
     onTitleEdited: (cardId, oldTitle, newTitle) => {
@@ -1503,5 +1521,9 @@ function showImportError(title, detail) {
   });
   document.body.appendChild(overlay);
 }
+
+window.addEventListener('pinboard:storage-full', () => {
+  showImportError('Storage full', 'Your browser storage is full. Try deleting unused boards or images to free up space.');
+});
 
 init().catch(console.error);

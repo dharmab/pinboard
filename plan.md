@@ -158,14 +158,17 @@
 - Error handling: modal dialog (`import-error-overlay` + `import-error-dialog`) with title, monospace detail area showing file/row/message, and OK dismiss button; used for both import validation failures and export errors
 - JSZip (v3.x) and jsPDF (v4.x) added as npm dependencies
 
+### Cross-Cutting Concerns (Increment 7)
+
+- `src/store/db.js` — `dbPut` catches `QuotaExceededError` and dispatches `pinboard:storage-full` custom event; `app.js` listens and shows an error dialog explaining the storage limit and suggesting cleanup
+- `src/ui/tabbar.js` — Tab buttons are `draggable="true"` with HTML5 drag-and-drop handlers; `dragover` shows a blue inset box-shadow drop indicator (before/after); `drop` computes new tab order and calls `reorderTabs()` from `tabs.js` to persist; visual feedback includes opacity fade on the dragged tab
+- `src/ui/canvas.js` — Pinch-to-zoom via `touchstart`/`touchmove`/`touchend` listeners; tracks two-finger distance and midpoint; zooms toward the pinch center using the same viewport math as scroll zoom; cancels any in-progress pan when pinch is detected
+- `src/ui/canvas.js` — Selection model extended with `selectedIds` Set for multi-select; `setSelection(id, type, additive)` toggles items in the set when `additive` is true (shift-click); `getSelectedIds()` exported for consumers; cards pass `e.shiftKey` through `onCardSelected` callback; floating panel shows for single selection, hides for multi-selection with an announcement of count
+- `src/ui/card.js` — `filter="url(#card-shadow)"` applied to each card `<g>` element, using the `feDropShadow` filter defined in `index.html` `<defs>` (dx=0, dy=2, stdDeviation=4, flood-opacity=0.12)
+- `src/style.css` — `.tab-drop-before` and `.tab-drop-after` classes with inset box-shadow indicators for tab drag-and-drop positioning
+
 ---
 
 ## What's Left
 
-### Cross-Cutting Concerns (Address Alongside Each Increment)
-
-- Storage quota error handling: abort write, show "Storage full" message
-- Tab reorder by dragging (spec mentions it, not yet implemented)
-- Pinch-to-zoom on touch (spec section 3.3)
-- Shift-click multi-select
-- Card drop shadow (filter is defined in SVG defs but not yet applied to card rects; cards use CSS `border` instead of SVG rect + filter since they use `foreignObject`)
+All spec features and cross-cutting concerns have been implemented.

@@ -9,7 +9,14 @@ let panStart = { x: 0, y: 0 };
 let panOrigin = { x: 0, y: 0 };
 let selectedId = null;
 let selectionType = null; // 'card', 'group', or 'connection'
+let selectedIds = new Set(); // for multi-select
 let callbacks = {};
+
+// Pinch-to-zoom state
+let pinchActive = false;
+let pinchStartDist = 0;
+let pinchStartZoom = 1.0;
+let pinchMidpoint = { x: 0, y: 0 };
 
 export function initCanvas(cbs) {
   callbacks = cbs;
@@ -21,6 +28,10 @@ export function initCanvas(cbs) {
   svg.addEventListener('pointerup', onPointerUp);
   svg.addEventListener('wheel', onWheel, { passive: false });
   svg.addEventListener('dblclick', onDblClick);
+
+  svg.addEventListener('touchstart', onTouchStart, { passive: false });
+  svg.addEventListener('touchmove', onTouchMove, { passive: false });
+  svg.addEventListener('touchend', onTouchEnd);
 
   applyTransform();
 }
@@ -98,6 +109,54 @@ function onDblClick(e) {
   callbacks.onCanvasDblClick?.(pos.x, pos.y);
 }
 
+function touchDistance(t1, t2) {
+  return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+}
+
+function onTouchStart(e) {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    // Cancel any in-progress pan
+    if (isPanning) {
+      isPanning = false;
+      svg.style.cursor = '';
+    }
+    pinchActive = true;
+    pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+    pinchStartZoom = viewport.zoom;
+    const rect = svg.getBoundingClientRect();
+    pinchMidpoint = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
+    };
+  }
+}
+
+function onTouchMove(e) {
+  if (!pinchActive || e.touches.length !== 2) return;
+  e.preventDefault();
+
+  const dist = touchDistance(e.touches[0], e.touches[1]);
+  const scale = dist / pinchStartDist;
+  const newZoom = clampZoom(pinchStartZoom * scale);
+
+  // Zoom toward the pinch midpoint
+  const canvasX = (pinchMidpoint.x - viewport.x) / viewport.zoom;
+  const canvasY = (pinchMidpoint.y - viewport.y) / viewport.zoom;
+  viewport.x = pinchMidpoint.x - canvasX * newZoom;
+  viewport.y = pinchMidpoint.y - canvasY * newZoom;
+  viewport.zoom = newZoom;
+
+  applyTransform();
+  callbacks.onZoomChange?.(viewport.zoom);
+}
+
+function onTouchEnd(e) {
+  if (pinchActive && e.touches.length < 2) {
+    pinchActive = false;
+  }
+}
+
 export function getViewport() {
   return { ...viewport };
 }
@@ -162,9 +221,34 @@ function zoomToward(screenX, screenY, factor) {
   callbacks.onZoomChange?.(viewport.zoom);
 }
 
-export function setSelection(id, type = 'card') {
-  selectedId = id;
-  selectionType = id ? type : null;
+export function setSelection(id, type = 'card', additive = false) {
+  if (additive && id && type === 'card') {
+    // Multi-select: toggle this card in the set
+    if (selectedIds.has(id)) {
+      selectedIds.delete(id);
+      if (selectedIds.size === 0) {
+        selectedId = null;
+        selectionType = null;
+      } else {
+        // Set primary selection to the last remaining item
+        const last = [...selectedIds].pop();
+        selectedId = last;
+        selectionType = 'card';
+      }
+    } else {
+      selectedIds.add(id);
+      selectedId = id;
+      selectionType = 'card';
+    }
+  } else {
+    // Single select: clear multi-select and set single
+    selectedIds.clear();
+    selectedId = id;
+    selectionType = id ? type : null;
+    if (id && type === 'card') {
+      selectedIds.add(id);
+    }
+  }
 
   // Update visual selection state on all cards
   const cardLayer = document.getElementById('card-layer');
@@ -172,7 +256,7 @@ export function setSelection(id, type = 'card') {
     for (const g of cardLayer.children) {
       const content = g.querySelector('.card-content');
       if (content) {
-        content.classList.toggle('selected', type === 'card' && g.dataset.placementId === id);
+        content.classList.toggle('selected', selectedIds.has(g.dataset.placementId));
       }
     }
   }
@@ -208,6 +292,10 @@ export function getSelection() {
 
 export function getSelectionType() {
   return selectionType;
+}
+
+export function getSelectedIds() {
+  return selectedIds;
 }
 
 export function getSvg() {

@@ -76,7 +76,14 @@ export async function dbPut(storeName, value) {
   const db = await getDB();
   const tx = db.transaction(storeName, 'readwrite');
   tx.objectStore(storeName).put(value);
-  await txDone(tx);
+  try {
+    await txDone(tx);
+  } catch (err) {
+    if (err?.name === 'QuotaExceededError') {
+      window.dispatchEvent(new CustomEvent('pinboard:storage-full'));
+    }
+    throw err;
+  }
 }
 
 export async function dbDelete(storeName, key) {
