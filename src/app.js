@@ -220,8 +220,6 @@ async function init() {
   await renderPlacements();
   await renderGroups();
   await renderConnections();
-  // Card heights are adjusted in a requestAnimationFrame; refresh connections after
-  requestAnimationFrame(() => refreshConnectionPaths());
   updateZoomDisplay(1.0);
 }
 
@@ -248,7 +246,6 @@ async function switchTab(tabId) {
   await renderPlacements();
   await renderGroups();
   await renderConnections();
-  requestAnimationFrame(() => refreshConnectionPaths());
   setSelection(null);
   hidePanel();
 }
@@ -614,8 +611,7 @@ async function renderPlacements() {
     if (!card) continue;
     const imgUrl = await getImageUrl(card.image_filename);
     const g = appendCardToLayer(placement, card, imgUrl);
-    // Defer height adjustment to next frame so DOM is settled
-    requestAnimationFrame(() => adjustCardHeight(g));
+    adjustCardHeight(g);
   }
 }
 
@@ -1125,6 +1121,18 @@ function onKeyDown(e) {
   // Don't intercept when typing in an input/textarea
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
   if (e.key === 'Delete' || e.key === 'Backspace') {
     const selType = getSelectionType();
     const ids = getSelectedIds();
@@ -1449,7 +1457,6 @@ async function switchBoard(boardId) {
   await renderPlacements();
   await renderGroups();
   await renderConnections();
-  requestAnimationFrame(() => refreshConnectionPaths());
   setSelection(null);
   hidePanel();
   setViewport({ x: 0, y: 0, zoom: 1.0 });

@@ -9,6 +9,13 @@ function createPhotoDiv(imageUrl, onOverlayClick) {
   img.src = imageUrl;
   img.alt = '';
   img.draggable = false;
+  img.addEventListener('load', () => {
+    // Re-adjust card height once the image dimensions are known
+    const content = img.closest('.card-content');
+    const fo = content?.parentElement;
+    const g = fo?.parentElement;
+    if (g?.dataset?.placementId || g?.dataset?.cardId) adjustCardHeight(g);
+  });
   img.addEventListener('error', () => {
     photoDiv.classList.add('card-photo-broken');
     img.style.display = 'none';
@@ -210,12 +217,10 @@ export function adjustCardHeight(g) {
   const div = g.querySelector('.card-content');
   if (!fo || !div) return;
 
-  // Temporarily set a large height to measure actual content
+  // Temporarily set a large height to allow content to expand for measurement
   fo.setAttribute('height', '1000');
   const actualHeight = div.getBoundingClientRect().height;
-  if (actualHeight > 0) {
-    fo.setAttribute('height', Math.ceil(actualHeight));
-  }
+  fo.setAttribute('height', Math.ceil(actualHeight || 80));
 }
 
 export function getCardRect(g) {
