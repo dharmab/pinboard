@@ -1,6 +1,6 @@
 const NS = 'http://www.w3.org/2000/svg';
 const CURVE_FACTOR = 0.25;
-const HANDLE_RADIUS = 6;
+const HANDLE_RADIUS = 10;
 
 export const CONNECTION_COLORS = {
   red: '#e11d48',

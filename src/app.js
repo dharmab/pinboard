@@ -1112,6 +1112,40 @@ async function deleteConnectionAction(connectionId) {
 
 // ── Connection handle hover + drag-to-create ──
 
+// Snap radius in canvas-space pixels for connection target detection
+const CONNECTION_SNAP_RADIUS = 40;
+
+// Find the nearest card or group element within the snap radius of a canvas point.
+// Returns the <g> element or null.
+function findNearestTarget(canvasX, canvasY) {
+  const cardLayer = document.getElementById('card-layer');
+  const groupLayer = document.getElementById('group-layer');
+  let best = null;
+  let bestDist = CONNECTION_SNAP_RADIUS;
+
+  for (const g of cardLayer.children) {
+    if (connectionSource && connectionSource.type === 'card' && g.dataset.placementId === connectionSource.id) continue;
+    const r = getCardRect(g);
+    const dist = distToRect(canvasX, canvasY, r);
+    if (dist < bestDist) { bestDist = dist; best = g; }
+  }
+  for (const g of groupLayer.children) {
+    if (connectionSource && connectionSource.type === 'group' && g.dataset.groupId === connectionSource.id) continue;
+    const r = getGroupRect(g);
+    const dist = distToRect(canvasX, canvasY, r);
+    if (dist < bestDist) { bestDist = dist; best = g; }
+  }
+  return best;
+}
+
+function distToRect(px, py, rect) {
+  const cx = Math.max(rect.x, Math.min(px, rect.x + rect.width));
+  const cy = Math.max(rect.y, Math.min(py, rect.y + rect.height));
+  const dx = px - cx;
+  const dy = py - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 function setupConnectionInteraction() {
   const svg = getSvg();
   const NS = 'http://www.w3.org/2000/svg';
@@ -1217,9 +1251,20 @@ function highlightTargetHandles(e) {
   const allHandles = document.querySelectorAll('.connection-handle.target-highlight');
   for (const h of allHandles) h.classList.remove('target-highlight');
 
-  const target = e.target;
-  const parentG = target.closest('[data-placement-id]') || target.closest('[data-group-id]');
-  if (!parentG) return;
+  // Try direct hit first, then snap to nearest target within radius
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  let parentG = target ? target.closest('[data-placement-id]') || target.closest('[data-group-id]') : null;
+  if (!parentG) {
+    const svg = getSvg();
+    const vp = getViewport();
+    const canvasPos = clientToCanvas(svg, e.clientX, e.clientY, vp);
+    parentG = findNearestTarget(canvasPos.x, canvasPos.y);
+  }
+  if (!parentG) {
+    // Cursor left the snap zone — clean up any lingering target highlight
+    if (hoveredElement) { hideHandles(hoveredElement); hoveredElement = null; }
+    return;
+  }
 
   const isCard = !!parentG.dataset.placementId;
   const targetType = isCard ? 'card' : 'group';
@@ -1263,9 +1308,14 @@ async function onHandleDragEnd(e) {
     hoveredElement = null;
   }
 
-  // Find target under cursor
-  const target = e.target;
-  const parentG = target.closest('[data-placement-id]') || target.closest('[data-group-id]');
+  // Find target under cursor, with snap fallback for near-misses
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  let parentG = target ? target.closest('[data-placement-id]') || target.closest('[data-group-id]') : null;
+  if (!parentG) {
+    const vp = getViewport();
+    const canvasPos = clientToCanvas(svg, e.clientX, e.clientY, vp);
+    parentG = findNearestTarget(canvasPos.x, canvasPos.y);
+  }
 
   if (!parentG) {
     // Released on empty canvas — cancel

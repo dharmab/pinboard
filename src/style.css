@@ -654,7 +654,7 @@ body {
 .connection-handle.target-highlight {
   opacity: 1;
   fill: #16a34a;
-  r: 8;
+  r: 12;
 }
 
 .connection-preview {
