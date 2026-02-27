@@ -1,0 +1,11 @@
+{
+  "name": "pinboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./index.html",
+    "build": "bun build ./index.html --minify --outdir=dist",
+    "preview": "bun ./dist/index.html"
+  }
+}

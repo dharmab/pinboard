@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pinboard</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <header id="toolbar"></header>
+  <nav id="tabbar"></nav>
+  <main id="canvas-container">
+    <svg id="canvas" role="application" aria-label="Pinboard canvas">
+      <defs>
+        <filter id="card-shadow" x="-10%" y="-10%" width="130%" height="130%">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.12" />
+        </filter>
+      </defs>
+      <g id="viewport-transform">
+        <rect id="canvas-bg" x="-50000" y="-50000" width="100000" height="100000" />
+        <g id="group-layer"></g>
+        <g id="connection-layer"></g>
+        <g id="card-layer"></g>
+      </g>
+    </svg>
+  </main>
+  <div id="aria-live" class="sr-only" aria-live="polite"></div>
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>
