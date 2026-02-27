@@ -1,4 +1,4 @@
-import { dbGet, dbPut, dbDelete } from './db.js';
+import { getDB, dbGet, dbPut, dbDelete } from './db.js';
 
 async function computeHash(blob) {
   const buffer = await blob.arrayBuffer();
@@ -27,4 +27,15 @@ export async function getImage(hash) {
 
 export async function deleteImage(hash) {
   await dbDelete('images', hash);
+}
+
+export async function getAllImageHashes() {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('images', 'readonly');
+    const store = tx.objectStore('images');
+    const req = store.getAllKeys();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }

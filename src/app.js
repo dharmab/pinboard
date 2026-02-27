@@ -15,9 +15,10 @@ import { createTab, getTabsByBoard, updateTab, deleteTab as deleteTabStore, reor
 import { createPlacement, getPlacement, getPlacementsByTab, getPlacementsByCard, updatePlacement, deletePlacement } from './store/placements.js';
 import { createGroup, getGroup, getGroupsByTab, updateGroup, deleteGroup } from './store/groups.js';
 import { createConnection, getConnection, getConnectionsByTab, updateConnection, deleteConnection, deleteConnectionsByTab } from './store/connections.js';
-import { saveImage, getImage, deleteImage } from './store/images.js';
+import { saveImage, getImage, deleteImage, getAllImageHashes } from './store/images.js';
 import { dbPut, dbDelete } from './store/db.js';
-import { executeCommand, undo, redo } from './utils/history.js';
+import { executeCommand, undo, redo, clearHistory } from './utils/history.js';
+import { CARD_WIDTH } from './utils/constants.js';
 import { clientToCanvas } from './utils/geometry.js';
 import { exportBoardAsZip } from './io/export-zip.js';
 import { importBoardFromZip } from './io/import-zip.js';
@@ -221,6 +222,9 @@ async function init() {
   await renderGroups();
   await renderConnections();
   updateZoomDisplay(1.0);
+
+  // Clean up orphaned images
+  gcOrphanedImages().catch(console.error);
 }
 
 async function switchTab(tabId) {
@@ -267,6 +271,12 @@ async function removeTab(tabId) {
   const tabs = await getTabsByBoard(currentBoard.id);
   if (tabs.length <= 1) return;
 
+  // Capture all data on this tab before deletion
+  const deletedTab = tabs.find(t => t.id === tabId);
+  const savedPlacements = await getPlacementsByTab(tabId);
+  const savedGroups = await getGroupsByTab(tabId);
+  const savedConnections = await getConnectionsByTab(tabId);
+
   await executeCommand({
     execute: async () => {
       // Delete all placements on this tab
@@ -291,12 +301,31 @@ async function removeTab(tabId) {
       }
     },
     undo: async () => {
-      const deletedTab = tabs.find(t => t.id === tabId);
-      const tab = { id: tabId, board_id: currentBoard.id, name: deletedTab.name, order: deletedTab.order, viewport_x: 0, viewport_y: 0, viewport_zoom: 1.0 };
+      const tab = { id: tabId, board_id: currentBoard.id, name: deletedTab.name, order: deletedTab.order, viewport_x: deletedTab.viewport_x, viewport_y: deletedTab.viewport_y, viewport_zoom: deletedTab.viewport_zoom };
       await dbPut('tabs', tab);
+
+      // Restore groups
+      for (const g of savedGroups) {
+        await dbPut('groups', g);
+      }
+      // Restore placements
+      for (const p of savedPlacements) {
+        await dbPut('placements', p);
+      }
+      // Restore connections
+      for (const c of savedConnections) {
+        await dbPut('connections', c);
+      }
 
       const allTabs = await getTabsByBoard(currentBoard.id);
       renderTabs(allTabs, currentTabId);
+
+      // If we're viewing the restored tab, re-render its content
+      if (currentTabId === tabId) {
+        await renderPlacements();
+        await renderGroups();
+        await renderConnections();
+      }
     },
   });
 }
@@ -330,7 +359,11 @@ async function addCardAt(x, y) {
     },
     undo: async () => {
       await deletePlacement(placementId);
-      // Don't delete the card globally — just remove the placement
+      // If card has no remaining placements, clean it up
+      const remaining = await getPlacementsByCard(card.id);
+      if (remaining.length === 0) {
+        await deleteCard(card.id);
+      }
       await renderPlacements();
       setSelection(null);
       hidePanel();
@@ -423,26 +456,52 @@ async function deleteCardEverywhere(cardId) {
   const card = await getCard(cardId);
   if (!card) return;
 
-  // Delete all placements for this card (across all tabs)
-  const allPlacements = await getPlacementsByCard(cardId);
-  for (const p of allPlacements) {
-    // Delete connections attached to each placement
+  // Capture all data before deletion
+  const savedPlacements = await getPlacementsByCard(cardId);
+  const savedConnections = [];
+  for (const p of savedPlacements) {
     const tabConns = await getConnectionsByTab(p.tab_id);
     for (const conn of tabConns) {
       if ((conn.from_type === 'card' && conn.from_id === p.id) ||
           (conn.to_type === 'card' && conn.to_id === p.id)) {
-        await deleteConnection(conn.id);
+        savedConnections.push(conn);
       }
     }
-    await deletePlacement(p.id);
   }
-  await deleteCard(cardId);
 
-  // Re-render current tab
-  await renderPlacements();
-  await renderConnections();
-  setSelection(null);
-  hidePanel();
+  await executeCommand({
+    execute: async () => {
+      const placements = await getPlacementsByCard(cardId);
+      for (const p of placements) {
+        const tabConns = await getConnectionsByTab(p.tab_id);
+        for (const conn of tabConns) {
+          if ((conn.from_type === 'card' && conn.from_id === p.id) ||
+              (conn.to_type === 'card' && conn.to_id === p.id)) {
+            await deleteConnection(conn.id);
+          }
+        }
+        await deletePlacement(p.id);
+      }
+      await deleteCard(cardId);
+
+      await renderPlacements();
+      await renderConnections();
+      setSelection(null);
+      hidePanel();
+    },
+    undo: async () => {
+      await dbPut('cards', card);
+      for (const p of savedPlacements) {
+        await dbPut('placements', p);
+      }
+      for (const c of savedConnections) {
+        await dbPut('connections', c);
+      }
+      await renderPlacements();
+      await renderConnections();
+    },
+  });
+
   announce(`Card "${card.title}" deleted`);
 }
 
@@ -545,7 +604,7 @@ function appendCardToLayer(placement, card, imageUrl) {
         danger: true,
         onClick: () => {
           showConfirmDialog(
-            `Delete "${card.title}" from all tabs? This cannot be undone.`,
+            `Delete "${card.title}" from all tabs?`,
             () => deleteCardEverywhere(card.id)
           );
         },
@@ -581,7 +640,7 @@ function appendCardToLayer(placement, card, imageUrl) {
 
 function findOverlappingGroup(cardX, cardY, placementId) {
   const groupLayer = document.getElementById('group-layer');
-  const cardWidth = 220;
+  const cardWidth = CARD_WIDTH;
   // Get approximate card height from DOM
   const cardLayer = document.getElementById('card-layer');
   const cardEl = cardLayer?.querySelector(`[data-placement-id="${placementId}"]`);
@@ -930,6 +989,11 @@ async function attachPhotoToCard(cardId, file) {
   executeCommand({
     execute: async () => {
       await updateCard(cardId, { image_filename: hash });
+      // Revoke old URL and clear cache entry
+      if (oldHash && imageUrlCache.has(oldHash)) {
+        URL.revokeObjectURL(imageUrlCache.get(oldHash));
+        imageUrlCache.delete(oldHash);
+      }
       imageUrlCache.delete(hash); // force re-fetch for fresh URL
       await refreshCardInDom(cardId);
       refreshConnectionPaths();
@@ -937,6 +1001,10 @@ async function attachPhotoToCard(cardId, file) {
     },
     undo: async () => {
       await updateCard(cardId, { image_filename: oldHash });
+      if (hash && imageUrlCache.has(hash)) {
+        URL.revokeObjectURL(imageUrlCache.get(hash));
+        imageUrlCache.delete(hash);
+      }
       await refreshCardInDom(cardId);
       refreshConnectionPaths();
       await refreshPanelForCard(cardId);
@@ -953,6 +1021,11 @@ async function removePhotoFromCard(cardId) {
   executeCommand({
     execute: async () => {
       await updateCard(cardId, { image_filename: null });
+      // Revoke old URL and clear cache entry
+      if (oldHash && imageUrlCache.has(oldHash)) {
+        URL.revokeObjectURL(imageUrlCache.get(oldHash));
+        imageUrlCache.delete(oldHash);
+      }
       await refreshCardInDom(cardId);
       refreshConnectionPaths();
       await refreshPanelForCard(cardId);
@@ -981,6 +1054,35 @@ async function refreshPanelForCard(cardId) {
   if (g) {
     const gRect = g.getBoundingClientRect();
     showCardPanel(placementId, card, gRect.right + 8, gRect.top, imgUrl);
+  }
+}
+
+// ── Image GC ──
+
+async function gcOrphanedImages() {
+  // Collect all image hashes referenced by cards across all boards
+  const referencedHashes = new Set();
+  const boards = await getAllBoards();
+  for (const board of boards) {
+    const cards = await getCardsByBoard(board.id);
+    for (const card of cards) {
+      if (card.image_filename) referencedHashes.add(card.image_filename);
+    }
+  }
+
+  // Get all stored image hashes
+  const storedHashes = await getAllImageHashes();
+
+  // Delete unreferenced images
+  for (const hash of storedHashes) {
+    if (!referencedHashes.has(hash)) {
+      // Revoke cached object URL if present
+      if (imageUrlCache.has(hash)) {
+        URL.revokeObjectURL(imageUrlCache.get(hash));
+        imageUrlCache.delete(hash);
+      }
+      await deleteImage(hash);
+    }
   }
 }
 
@@ -1440,6 +1542,8 @@ async function switchBoard(boardId) {
   const board = await getBoard(boardId);
   if (!board) return;
 
+  clearHistory();
+  gcOrphanedImages().catch(console.error);
   currentBoard = board;
   updateBoardNameDisplay(board.name);
 

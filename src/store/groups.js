@@ -23,10 +23,14 @@ export async function getGroupsByTab(tabId) {
   return dbGetAllFromIndex('groups', 'tab_id', tabId);
 }
 
+const GROUP_FIELDS = ['tab_id', 'label', 'x', 'y', 'width', 'height'];
+
 export async function updateGroup(id, updates) {
   const group = await dbGet('groups', id);
   if (!group) return null;
-  Object.assign(group, updates);
+  for (const key of GROUP_FIELDS) {
+    if (key in updates) group[key] = updates[key];
+  }
   await dbPut('groups', group);
   return group;
 }

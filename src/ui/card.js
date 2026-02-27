@@ -1,4 +1,5 @@
-const CARD_WIDTH = 220;
+import { CARD_WIDTH } from '../utils/constants.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 
 function createPhotoDiv(imageUrl, onOverlayClick) {

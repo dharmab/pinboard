@@ -4,17 +4,13 @@ import { createBoard, getAllBoards } from '../store/board.js';
 import { dbPut } from '../store/db.js';
 import { saveImage } from '../store/images.js';
 import { createId } from '../utils/uuid.js';
+import { formatDate } from '../utils/export-helpers.js';
 
 const VALID_COLORS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray']);
 const VALID_ENDPOINT_TYPES = new Set(['card', 'group']);
 
-function formatDate() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+const MAX_ROWS = 50000;
+const MAX_FIELD_LENGTH = 10000;
 
 class ImportError extends Error {
   constructor(file, row, message) {
@@ -45,6 +41,14 @@ function requireNumeric(row, field, filename, rowIndex) {
   }
 }
 
+function checkFieldLengths(row, filename, rowIndex) {
+  for (const [key, val] of Object.entries(row)) {
+    if (typeof val === 'string' && val.length > MAX_FIELD_LENGTH) {
+      throw new ImportError(filename, rowIndex + 2, `Field "${key}" exceeds maximum length of ${MAX_FIELD_LENGTH} characters`);
+    }
+  }
+}
+
 export async function importBoardFromZip(file) {
   const zip = await JSZip.loadAsync(file);
 
@@ -59,6 +63,13 @@ export async function importBoardFromZip(file) {
     }
     const text = await entry.async('string');
     csvData[name] = parseCsv(text);
+  }
+
+  // Validate row counts
+  for (const name of csvFiles) {
+    if (csvData[name].rows.length > MAX_ROWS) {
+      throw new ImportError(name, 0, `Too many rows (${csvData[name].rows.length}). Maximum is ${MAX_ROWS}`);
+    }
   }
 
   // Validate headers
@@ -77,6 +88,7 @@ export async function importBoardFromZip(file) {
   // Validate cards
   for (let i = 0; i < csvData['cards.csv'].rows.length; i++) {
     const row = csvData['cards.csv'].rows[i];
+    checkFieldLengths(row, 'cards.csv', i);
     requireField(row, 'id', 'cards.csv', i);
     requireField(row, 'title', 'cards.csv', i);
     cardIds.add(row.id);
@@ -85,6 +97,7 @@ export async function importBoardFromZip(file) {
   // Validate tabs
   for (let i = 0; i < csvData['tabs.csv'].rows.length; i++) {
     const row = csvData['tabs.csv'].rows[i];
+    checkFieldLengths(row, 'tabs.csv', i);
     requireField(row, 'id', 'tabs.csv', i);
     requireField(row, 'name', 'tabs.csv', i);
     requireField(row, 'order', 'tabs.csv', i);
@@ -95,6 +108,7 @@ export async function importBoardFromZip(file) {
   // Validate groups
   for (let i = 0; i < csvData['groups.csv'].rows.length; i++) {
     const row = csvData['groups.csv'].rows[i];
+    checkFieldLengths(row, 'groups.csv', i);
     requireField(row, 'id', 'groups.csv', i);
     requireField(row, 'tab_id', 'groups.csv', i);
     requireField(row, 'label', 'groups.csv', i);
@@ -112,6 +126,7 @@ export async function importBoardFromZip(file) {
   // Validate placements
   for (let i = 0; i < csvData['placements.csv'].rows.length; i++) {
     const row = csvData['placements.csv'].rows[i];
+    checkFieldLengths(row, 'placements.csv', i);
     requireField(row, 'id', 'placements.csv', i);
     requireField(row, 'tab_id', 'placements.csv', i);
     requireField(row, 'card_id', 'placements.csv', i);
@@ -133,6 +148,7 @@ export async function importBoardFromZip(file) {
   // Validate connections
   for (let i = 0; i < csvData['connections.csv'].rows.length; i++) {
     const row = csvData['connections.csv'].rows[i];
+    checkFieldLengths(row, 'connections.csv', i);
     requireField(row, 'tab_id', 'connections.csv', i);
     requireField(row, 'from_type', 'connections.csv', i);
     requireField(row, 'from_id', 'connections.csv', i);

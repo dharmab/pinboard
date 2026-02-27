@@ -26,21 +26,18 @@ export async function getPlacementsByCard(cardId) {
   return dbGetAllFromIndex('placements', 'card_id', cardId);
 }
 
+const PLACEMENT_FIELDS = ['tab_id', 'card_id', 'x', 'y', 'group_id'];
+
 export async function updatePlacement(id, updates) {
   const placement = await dbGet('placements', id);
   if (!placement) return null;
-  Object.assign(placement, updates);
+  for (const key of PLACEMENT_FIELDS) {
+    if (key in updates) placement[key] = updates[key];
+  }
   await dbPut('placements', placement);
   return placement;
 }
 
 export async function deletePlacement(id) {
   await dbDelete('placements', id);
-}
-
-export async function deletePlacementsByTab(tabId) {
-  const placements = await dbGetAllFromIndex('placements', 'tab_id', tabId);
-  for (const p of placements) {
-    await dbDelete('placements', p.id);
-  }
 }

@@ -103,7 +103,7 @@ export async function showCardLibrary(cards, getImageUrl, cbs) {
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         showConfirmDialog(
-          `Delete "${card.title}" from all tabs? This cannot be undone.`,
+          `Delete "${card.title}" from all tabs?`,
           () => {
             callbacks.onDeleteCard(card.id);
             item.remove();

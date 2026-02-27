@@ -6,18 +6,7 @@ import { getPlacementsByTab } from '../store/placements.js';
 import { getGroupsByTab } from '../store/groups.js';
 import { getConnectionsByTab } from '../store/connections.js';
 import { getImage } from '../store/images.js';
-
-function formatDate() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function sanitizeFilename(name) {
-  return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'board';
-}
+import { formatDate, sanitizeFilename, downloadBlob } from '../utils/export-helpers.js';
 
 export async function exportBoardAsZip(board) {
   const zip = new JSZip();
@@ -132,13 +121,3 @@ function extensionFromType(contentType) {
   return map[contentType] || '.bin';
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}

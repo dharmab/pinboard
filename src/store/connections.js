@@ -24,10 +24,14 @@ export async function getConnectionsByTab(tabId) {
   return dbGetAllFromIndex('connections', 'tab_id', tabId);
 }
 
+const CONNECTION_FIELDS = ['tab_id', 'from_type', 'from_id', 'to_type', 'to_id', 'label', 'color'];
+
 export async function updateConnection(id, updates) {
   const connection = await dbGet('connections', id);
   if (!connection) return null;
-  Object.assign(connection, updates);
+  for (const key of CONNECTION_FIELDS) {
+    if (key in updates) connection[key] = updates[key];
+  }
   await dbPut('connections', connection);
   return connection;
 }

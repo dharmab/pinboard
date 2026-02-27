@@ -21,10 +21,14 @@ export async function getCardsByBoard(boardId) {
   return dbGetAllFromIndex('cards', 'board_id', boardId);
 }
 
+const CARD_FIELDS = ['title', 'description', 'image_filename'];
+
 export async function updateCard(id, updates) {
   const card = await dbGet('cards', id);
   if (!card) return null;
-  Object.assign(card, updates);
+  for (const key of CARD_FIELDS) {
+    if (key in updates) card[key] = updates[key];
+  }
   await dbPut('cards', card);
   return card;
 }

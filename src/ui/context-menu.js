@@ -49,7 +49,7 @@ export function showContextMenu(x, y, items) {
       closeContextMenu();
     }
   };
-  setTimeout(() => document.addEventListener('click', closeOnClick, { once: true }), 0);
+  requestAnimationFrame(() => document.addEventListener('click', closeOnClick, { once: true }));
   menu._cleanup = () => document.removeEventListener('click', closeOnClick);
 }
 

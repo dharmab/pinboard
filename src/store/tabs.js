@@ -24,10 +24,14 @@ export async function getTabsByBoard(boardId) {
   return tabs.sort((a, b) => a.order - b.order);
 }
 
+const TAB_FIELDS = ['name', 'order', 'viewport_x', 'viewport_y', 'viewport_zoom'];
+
 export async function updateTab(id, updates) {
   const tab = await dbGet('tabs', id);
   if (!tab) return null;
-  Object.assign(tab, updates);
+  for (const key of TAB_FIELDS) {
+    if (key in updates) tab[key] = updates[key];
+  }
   await dbPut('tabs', tab);
   return tab;
 }
