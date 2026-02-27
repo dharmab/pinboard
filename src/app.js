@@ -1,7 +1,7 @@
 import { initTheme, toggleTheme } from './ui/theme.js';
 import { initToolbar, updateZoomDisplay, updateBoardNameDisplay } from './ui/toolbar.js';
 import { initTabBar, renderTabs } from './ui/tabbar.js';
-import { initCanvas, getViewport, setViewport, zoomIn, zoomOut, zoomReset, fitAll, setSelection, getSelectedIds, getSvg } from './ui/canvas.js';
+import { initCanvas, getViewport, setViewport, zoomIn, zoomOut, zoomReset, fitAll, setSelection, getSelection, getSelectionType, getSelectedIds, getSvg } from './ui/canvas.js';
 import { initFloatingPanel, showCardPanel, showGroupPanel, showConnectionPanel, hidePanel, getCurrentPlacementId } from './ui/floating-panel.js';
 import { showContextMenu, closeContextMenu, showConfirmDialog } from './ui/context-menu.js';
 import { showCardLibrary, closeCardLibrary } from './ui/card-library.js';
@@ -190,6 +190,25 @@ async function init() {
       const vp = getViewport();
       const pos = clientToCanvas(svg, e.clientX, e.clientY, vp);
       await placeCardFromLibrary(cardId, pos.x, pos.y);
+    }
+  });
+
+  // Paste image from clipboard onto selected card
+  document.addEventListener('paste', async (e) => {
+    // Don't intercept paste in text inputs
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+
+    if (getSelectionType() !== 'card' || getSelectedIds().size !== 1) return;
+
+    const file = [...(e.clipboardData?.files || [])].find(f => ACCEPTED_IMAGE_TYPES.has(f.type));
+    if (!file) return;
+
+    e.preventDefault();
+    const placementId = getSelection();
+    const placement = await getPlacement(placementId);
+    if (placement) {
+      attachPhotoToCard(placement.card_id, file);
     }
   });
 

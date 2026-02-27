@@ -545,6 +545,12 @@ body {
   color: #fff;
 }
 
+.panel-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
 .panel-remove-btn {
   display: inline-flex;
   align-items: center;

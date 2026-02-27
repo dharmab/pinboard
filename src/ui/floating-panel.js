@@ -119,6 +119,12 @@ export function showCardPanel(placementId, card, screenX, screenY, imageUrl) {
 
   photoField.appendChild(photoButtons);
 
+  const pasteHint = document.createElement('div');
+  pasteHint.className = 'panel-hint';
+  const modifier = navigator.platform?.startsWith('Mac') ? '\u2318' : 'Ctrl+';
+  pasteHint.textContent = `You can also ${modifier}V to paste an image`;
+  photoField.appendChild(pasteHint);
+
   // Remove from tab button
   const actions = document.createElement('div');
   actions.className = 'panel-actions';
