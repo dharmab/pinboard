@@ -19,6 +19,10 @@ import { saveImage, getImage, deleteImage } from './store/images.js';
 import { dbPut, dbDelete } from './store/db.js';
 import { executeCommand, undo, redo } from './utils/history.js';
 import { clientToCanvas } from './utils/geometry.js';
+import { exportBoardAsZip } from './io/export-zip.js';
+import { importBoardFromZip } from './io/import-zip.js';
+import { exportTabAsImage } from './io/export-png.js';
+import { exportTabAsPdf } from './io/export-pdf.js';
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const imageUrlCache = new Map(); // hash -> objectURL
@@ -62,6 +66,10 @@ async function init() {
     onAddGroup: () => addGroupAtCenter(),
     onCardLibrary: () => openCardLibrary(),
     onBoardSwitcher: () => openBoardSwitcher(),
+    onExportZip: () => handleExportZip(),
+    onImportZip: () => handleImportZip(),
+    onExportPng: () => handleExportPng(),
+    onExportPdf: () => handleExportPdf(),
     onZoomIn: () => zoomIn(),
     onZoomOut: () => zoomOut(),
     onZoomReset: () => zoomReset(),
@@ -1413,6 +1421,87 @@ async function deleteBoardAction(boardId) {
   if (currentBoard.id === boardId) {
     await switchBoard(remainingBoards[0].id);
   }
+}
+
+// ── Import/Export ──
+
+async function handleExportZip() {
+  try {
+    await exportBoardAsZip(currentBoard);
+  } catch (err) {
+    showImportError('Export failed', err.message);
+  }
+}
+
+function handleImportZip() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.zip';
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const board = await importBoardFromZip(file);
+      await switchBoard(board.id);
+      announce(`Board "${board.name}" imported`);
+    } catch (err) {
+      const detail = err.file
+        ? `File: ${err.file}, Row: ${err.row}\n${err.message}`
+        : err.message;
+      showImportError('Import failed', detail);
+    }
+  });
+  input.click();
+}
+
+async function handleExportPng() {
+  try {
+    const tabs = await getTabsByBoard(currentBoard.id);
+    const tab = tabs.find(t => t.id === currentTabId);
+    await exportTabAsImage(currentBoard.name, tab?.name || 'tab');
+  } catch (err) {
+    showImportError('Image export failed', err.message);
+  }
+}
+
+async function handleExportPdf() {
+  try {
+    const tabs = await getTabsByBoard(currentBoard.id);
+    const tab = tabs.find(t => t.id === currentTabId);
+    await exportTabAsPdf(currentBoard.name, tab?.name || 'tab');
+  } catch (err) {
+    showImportError('PDF export failed', err.message);
+  }
+}
+
+function showImportError(title, detail) {
+  const overlay = document.createElement('div');
+  overlay.className = 'import-error-overlay';
+
+  const dialog = document.createElement('div');
+  dialog.className = 'import-error-dialog';
+
+  const h3 = document.createElement('h3');
+  h3.textContent = title;
+  dialog.appendChild(h3);
+
+  if (detail) {
+    const detailDiv = document.createElement('div');
+    detailDiv.className = 'error-detail';
+    detailDiv.textContent = detail;
+    dialog.appendChild(detailDiv);
+  }
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'OK';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  dialog.appendChild(closeBtn);
+
+  overlay.appendChild(dialog);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
 }
 
 init().catch(console.error);

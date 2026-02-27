@@ -19,6 +19,7 @@ const ICONS = {
   group: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z',
   boards: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   cards: 'M21 3H3a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zM9 7h6M9 11h6M9 15h4',
+  export: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
 };
 
 export function initToolbar(callbacks) {
@@ -48,6 +49,16 @@ export function initToolbar(callbacks) {
   const addGroupBtn = makeBtn('New Group', icon(ICONS.group) + ' Group', () => callbacks.onAddGroup());
   const cardsBtn = makeBtn('Card Library', icon(ICONS.cards), () => callbacks.onCardLibrary());
 
+  // Export dropdown
+  const exportContainer = document.createElement('div');
+  exportContainer.className = 'export-dropdown-container';
+  exportContainer.style.position = 'relative';
+
+  const exportBtn = makeBtn('Export', icon(ICONS.export) + ' Export', () => {
+    toggleExportMenu(exportContainer, callbacks);
+  });
+  exportContainer.appendChild(exportBtn);
+
   const sep3 = separator();
 
   const spacer = document.createElement('div');
@@ -73,7 +84,7 @@ export function initToolbar(callbacks) {
   toolbar.append(
     boardSwitcherBtn, boardName, sep1,
     undoBtn, redoBtn, sep2,
-    addCardBtn, addGroupBtn, cardsBtn, sep3,
+    addCardBtn, addGroupBtn, cardsBtn, exportContainer, sep3,
     spacer,
     zoomOutBtn, zoomDisplay, zoomInBtn, fitAllBtn, sep4,
     themeBtn
@@ -97,6 +108,61 @@ function makeBtn(label, innerHTML, onClick) {
   btn.title = label;
   btn.addEventListener('click', onClick);
   return btn;
+}
+
+let activeExportMenu = null;
+
+function toggleExportMenu(container, callbacks) {
+  if (activeExportMenu) {
+    closeExportMenu();
+    return;
+  }
+
+  const menu = document.createElement('div');
+  menu.className = 'export-menu';
+
+  const items = [
+    { label: 'Download ZIP', action: () => { closeExportMenu(); callbacks.onExportZip?.(); } },
+    { label: 'Import from ZIP', action: () => { closeExportMenu(); callbacks.onImportZip?.(); } },
+    'separator',
+    { label: 'Download Image', action: () => { closeExportMenu(); callbacks.onExportPng?.(); } },
+    { label: 'Download PDF', action: () => { closeExportMenu(); callbacks.onExportPdf?.(); } },
+  ];
+
+  for (const item of items) {
+    if (item === 'separator') {
+      const sep = document.createElement('div');
+      sep.className = 'context-menu-separator';
+      menu.appendChild(sep);
+      continue;
+    }
+    const btn = document.createElement('button');
+    btn.textContent = item.label;
+    btn.addEventListener('click', item.action);
+    menu.appendChild(btn);
+  }
+
+  container.appendChild(menu);
+  activeExportMenu = menu;
+
+  // Close on click outside
+  function onClickOutside(e) {
+    if (!container.contains(e.target)) {
+      closeExportMenu();
+      document.removeEventListener('pointerdown', onClickOutside, true);
+    }
+  }
+  // Delay to avoid the current click from immediately closing
+  requestAnimationFrame(() => {
+    document.addEventListener('pointerdown', onClickOutside, true);
+  });
+}
+
+function closeExportMenu() {
+  if (activeExportMenu) {
+    activeExportMenu.remove();
+    activeExportMenu = null;
+  }
 }
 
 function updateUndoRedoState() {

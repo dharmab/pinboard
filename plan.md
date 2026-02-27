@@ -147,20 +147,20 @@
 - `deleteBoardAction` function: cascading delete of all tabs, placements, groups, connections, and cards for the board; switches to the first remaining board
 - CSS: `.context-menu` shared styles (same visual treatment as tab context menu), `.context-menu-danger` (red text, red background on hover), `.context-menu-separator` (1px border line), `.confirm-overlay` + `.confirm-dialog` (centered modal with Cancel/Delete buttons), `.card-library-overlay` + `.card-library` (centered panel, max 720px wide, scrollable body), `.board-switcher` (fixed dropdown, 260px wide, item hover actions with opacity transition)
 
+### Import/Export (Increment 6)
+
+- `src/io/csv.js` — RFC 4180–compliant CSV serializer (`toCsv`) and parser (`parseCsv`); UTF-8 with BOM, CRLF line endings, double-quote escaping; no external libraries
+- `src/io/export-zip.js` — `exportBoardAsZip(board)` serializes cards, tabs, placements, groups, and connections to five CSV files, collects image blobs from IndexedDB, assembles ZIP via JSZip, and triggers download as `{board_name}_{YYYY-MM-DD}.zip`
+- `src/io/import-zip.js` — `importBoardFromZip(file)` reads and validates all five CSV files per spec section 11.7 (missing files, missing headers, cross-file reference integrity, type/color validation, self-connection rejection, image filename verification); remaps all IDs to new UUIDs; imports images via `saveImage` (preserves SHA-256 deduplication); creates a new board named `{name} (imported {date})` on conflict; returns the new board object; throws `ImportError` with file, row, and message on validation failure
+- `src/io/export-png.js` — `exportTabAsImage(boardName, tabName, scale)` clones the SVG canvas, inlines light-mode CSS styles, converts card photo `<img>` elements to data URLs, serializes to SVG XML, renders to offscreen canvas at 2x scale, and downloads as WebP (when browser supports it and dimensions fit within 16384px limit) or PNG fallback; filename `{board}_{tab}_{date}.webp`
+- `src/io/export-pdf.js` — `exportTabAsPdf(boardName, tabName, pageSize)` uses the same SVG-to-canvas pipeline as PNG export, then embeds the raster image into a jsPDF document with auto-orientation (landscape/portrait) and centered margin placement; downloads as `{board}_{tab}_{date}.pdf`
+- Toolbar "Export" dropdown button (download icon) with menu items: Download ZIP, Import from ZIP, Download Image, Download PDF
+- Error handling: modal dialog (`import-error-overlay` + `import-error-dialog`) with title, monospace detail area showing file/row/message, and OK dismiss button; used for both import validation failures and export errors
+- JSZip (v3.x) and jsPDF (v4.x) added as npm dependencies
+
 ---
 
 ## What's Left
-
-### Increment 6 — Import/Export
-
-- `src/io/export-zip.js` — Serialize all stores to CSV, collect images, assemble ZIP (JSZip)
-- `src/io/import-zip.js` — Parse and validate CSV, remap IDs, import images, create new board (Papa Parse)
-- `src/io/export-png.js` — Bounding box render to offscreen canvas at 2x (light-mode colors), download PNG
-- `src/io/export-pdf.js` — Offscreen render embedded in PDF via jsPDF, A4/Letter choice
-- `src/io/csv.js` — CSV serialization/deserialization helpers
-- Export menu in toolbar
-- Validation rules per spec section 11.7
-- Error handling: modal dialogs with row-level error messages
 
 ### Cross-Cutting Concerns (Address Alongside Each Increment)
 
